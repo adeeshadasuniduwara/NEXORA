@@ -153,6 +153,6 @@ function init(){
  $("refreshBtn").addEventListener("click",()=>{loadSymbols().then(()=>{loadCandles();startLive()})});
  window.addEventListener("resize",()=>{clearTimeout(state.resizeTimer);state.resizeTimer=setTimeout(drawChart,100)});
  api("/health").then(()=>{health("localHealth","Online",true);$("engineLabel").textContent="Local engine online"}).catch(()=>health("localHealth","Offline",false));
- loadSymbols().then(()=>{if(!state.symbols.length)return;$("pairSearch").value=state.symbol;selectSymbol(state.symbol)});
+ loadSymbols().then(()=>{if(!state.symbols.length)return;$("pairSearch").value=state.symbol;selectSymbol(state.symbol)});\n setInterval(()=>loadSymbols(),5*60*1000);
 }
 document.addEventListener("DOMContentLoaded",init);
