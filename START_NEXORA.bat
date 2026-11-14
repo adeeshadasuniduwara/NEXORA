@@ -27,12 +27,18 @@ if not errorlevel 1 (
 set "PYTHON="
 where py >nul 2>nul
 if not errorlevel 1 (
-  py -3.12 --version >nul 2>nul && set "PYTHON=py -3.12"
-  if not defined PYTHON py -3 --version >nul 2>nul && set "PYTHON=py -3"
+  py -3.14 --version >nul 2>nul && set "PYTHON=py -3.14"
+  if not defined PYTHON py -3.13 --version >nul 2>nul && set "PYTHON=py -3.13"
+  if not defined PYTHON py -3.12 --version >nul 2>nul && set "PYTHON=py -3.12"
+  if not defined PYTHON py -3.11 --version >nul 2>nul && set "PYTHON=py -3.11"
+  if not defined PYTHON py -3.10 --version >nul 2>nul && set "PYTHON=py -3.10"
 )
 if not defined PYTHON (
   where python >nul 2>nul
-  if not errorlevel 1 python --version >nul 2>nul && set "PYTHON=python"
+  if not errorlevel 1 (
+    python -c "import sys; raise SystemExit(sys.version_info < (3,10))" >nul 2>nul
+    if not errorlevel 1 set "PYTHON=python"
+  )
 )
 if not defined PYTHON (
   echo [ERROR] Python 3.10 or newer was not found.
