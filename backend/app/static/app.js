@@ -7,6 +7,7 @@ async function api(path,options={}){const response=await fetch(path,options);if(
 function health(id,message,ok){$(id).textContent=message;$(id).classList.toggle("bad",!ok);$(id).classList.toggle("good",!!ok)}
 function setPrice(value){if(value===undefined||value===null)return;const price=fmt(value);$("chartPrice").textContent=price;$("statPrice").textContent=price}
 async function loadCandles(){
+ state.historyExhausted=false;state.historyLoading=false;
  $("chartLoading").classList.remove("hidden");
  try{
   const data=await api(`${API}/market/candles?symbol=${encodeURIComponent(state.symbol)}&interval=${state.interval}&limit=1000`);
