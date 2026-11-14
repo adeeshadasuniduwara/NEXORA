@@ -30,7 +30,7 @@ A chart-first crypto market analysis workspace powered by Binance public market 
 1. A change is merged or pushed to `main`.
 2. GitHub Actions runs the backend test suite.
 3. Only after tests pass, the release job packages the app and publishes a versioned GitHub Release with a SHA-256 checksum.
-4. Running NEXORA clients check the latest release every 60 seconds.
+4. Running NEXORA clients check the latest release every 30 seconds.
 5. When a newer version is found, the client downloads and verifies the package, installs it in a detached helper, and restarts the local server.
 6. After restart, a notification displays the version, release notes, and local installation time.
 
