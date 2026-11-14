@@ -42,3 +42,25 @@ def test_safe_extract_rejects_path_traversal(tmp_path: Path):
 def test_release_version_file_matches_application_version():
     repository_version = Path(__file__).resolve().parents[2] / "VERSION"
     assert repository_version.read_text(encoding="utf-8").strip() == APP_VERSION
+
+
+def test_update_helper_leaves_restart_to_the_existing_launcher():
+    root = Path(__file__).resolve().parents[2]
+    helper = (root / "backend" / "app" / "update_helper.py").read_text(encoding="utf-8")
+    launcher = (root / "START_NEXORA.bat").read_text(encoding="utf-8")
+    service = (root / "backend" / "app" / "update_service.py").read_text(encoding="utf-8")
+
+    assert "restart_workspace" not in helper
+    assert "subprocess.Popen" not in helper
+    assert 'pending = root / ".nexora_updates" / ".pending"' in helper
+    assert 'pending = root / ".nexora_updates" / ".pending"' in service
+    assert 'if exist ".nexora_updates\\.pending" goto wait_for_update' in launcher
+    assert 'if not exist ".nexora_updates\\.pending" goto update_dependencies' in launcher
+    assert "goto run_server" in launcher
+
+
+def test_launcher_captures_uvicorn_exit_code_before_changing_directory():
+    root = Path(__file__).resolve().parents[2]
+    launcher = (root / "START_NEXORA.bat").read_text(encoding="utf-8")
+    assert '"%VPY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000\nset "SERVER_EXIT=%ERRORLEVEL%"\ncd /d "%~dp0"' in launcher
+    assert 'if not "%SERVER_EXIT%"=="0" (' in launcher

@@ -1,7 +1,12 @@
-"""Detached installer: waits for the API process to exit, applies a release, and relaunches NEXORA."""
+"""Apply a verified update after the API process exits.
+
+The Windows launcher owns the console and performs the restart itself. This
+helper deliberately never launches another CMD window or another server.
+"""
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import shutil
@@ -15,21 +20,30 @@ from pathlib import Path, PurePosixPath
 ALLOWED_PREFIXES = ("backend/app/", "backend/requirements.txt", "START_NEXORA.bat", "VERSION", "docs/")
 
 
+def _windows_pid_running(pid: int) -> bool:
+    result = subprocess.run(
+        ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+        capture_output=True, text=True, timeout=5,
+    )
+    for row in csv.reader(result.stdout.splitlines()):
+        if len(row) > 1 and row[1].strip() == str(pid):
+            return True
+    return False
+
+
 def wait_for_process(pid: int, timeout: int = 120) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if os.name == "nt":
-            result = subprocess.run(
-                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-                capture_output=True, text=True, timeout=5,
-            )
-            if str(pid) not in result.stdout:
+            if not _windows_pid_running(pid):
                 return
         else:
             try:
                 os.kill(pid, 0)
-            except OSError:
+            except ProcessLookupError:
                 return
+            except PermissionError:
+                pass
         time.sleep(0.5)
     raise TimeoutError("NEXORA server process did not stop in time; update was not applied.")
 
@@ -91,21 +105,6 @@ def safe_extract(archive: Path, root: Path) -> None:
         raise
 
 
-def restart_workspace(root: Path) -> None:
-    launcher = root / "START_NEXORA.bat"
-    if os.name == "nt" and launcher.exists():
-        flags = getattr(subprocess, "DETACHED_PROCESS", 0x00000008) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
-        subprocess.Popen(
-            ["cmd.exe", "/c", f'set "NEXORA_NO_BROWSER=1" && call "{launcher}"'], cwd=root, stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags,
-        )
-    else:
-        subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
-            cwd=root / "backend",
-        )
-
-
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True)
@@ -115,10 +114,11 @@ def main() -> int:
     args = parser.parse_args()
     root, archive = Path(args.root).resolve(), Path(args.archive).resolve()
     manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
-    wait_for_process(args.parent_pid)
-
+    pending = root / ".nexora_updates" / ".pending"
     failure = None
+
     try:
+        wait_for_process(args.parent_pid)
         if (root / ".git").exists():
             status = subprocess.run(["git", "status", "--porcelain"], cwd=root, capture_output=True, text=True)
             branch = subprocess.run(["git", "branch", "--show-current"], cwd=root, capture_output=True, text=True)
@@ -140,8 +140,12 @@ def main() -> int:
         "release_notes": manifest.get("release_notes", ""),
         "error": failure,
     }
-    (root / ".nexora_update_state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
-    restart_workspace(root)
+    try:
+        (root / ".nexora_update_state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
+    finally:
+        # The original START_NEXORA.bat watches this marker and restarts its
+        # own Uvicorn process in the same console after the install is complete.
+        pending.unlink(missing_ok=True)
     return 1 if failure else 0
 
 
