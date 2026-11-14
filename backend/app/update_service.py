@@ -9,9 +9,11 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -146,4 +148,14 @@ def begin_update() -> dict[str, Any]:
         command, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL, close_fds=True, creationflags=creation_flags,
     )
+    # Let FastAPI return the HTTP response before asking Uvicorn to shut down.
+    server_pid = os.getpid()
+    def request_shutdown() -> None:
+        try:
+            os.kill(server_pid, signal.SIGTERM)
+        except OSError:
+            pass
+    timer = threading.Timer(2.0, request_shutdown)
+    timer.daemon = True
+    timer.start()
     return {"started": True, "status": "installing", "version": release["latest_version"], "message": "Update verified and installation is starting."}
