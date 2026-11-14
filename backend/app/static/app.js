@@ -1,5 +1,5 @@
 const API="/api/v1";
-const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,book:{bids:[],asks:[]}};
+const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]}};
 const $=id=>document.getElementById(id);
 const fmt=(v,max=8)=>Number(v||0).toLocaleString("en-US",{maximumFractionDigits:max});
 const compact=v=>{const n=Number(v||0);return n>=1e9?(n/1e9).toFixed(2)+"B":n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(2)+"K":fmt(n,2)};
@@ -47,7 +47,7 @@ async function loadSymbols(){
 function selectSymbol(symbol){
  state.symbol=symbol;try{localStorage.setItem("nexora-selected-symbol",symbol)}catch(error){}$("pairSearch").value=symbol;$("statSymbol").textContent=symbol;$("chartTitle").innerHTML=symbol+" <span>·</span> "+state.interval.toUpperCase();
  $("bookMidPrice").textContent="—";$("bookSpread").textContent="Spread —";$("asks").innerHTML='<div class="book-empty">Loading ask depth…</div>';$("bids").innerHTML='<div class="book-empty">Loading bid depth…</div>';
- state.book={bids:[],asks:[]};state.trades=[];renderPressure();loadCandles().then(startLive);
+ state.book={bids:[],asks:[]};state.bookLastUpdateAt=0;$("depthStatus").textContent="WAITING";$("depthStatus").classList.remove("live-tag");state.trades=[];renderPressure();loadCandles().then(startLive);
 }
 function searchPair(){
  const query=$("pairSearch").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
@@ -104,7 +104,7 @@ function renderBook(){
 }
 function updateBook(data){
  if(!Array.isArray(data.bids)||!Array.isArray(data.asks))return;
- state.book={bids:data.bids,asks:data.asks};renderBook();
+ state.book={bids:data.bids,asks:data.asks};state.bookLastUpdateAt=Date.now();renderBook();
 }
 function updateTrade(trade){
  const buyerInitiated=!trade.m;
@@ -131,7 +131,7 @@ function handleLiveEvent(event){
 function connectSocket(generation){
  const scheme=location.protocol==="https:"?"wss":"ws",socket=new WebSocket(scheme+"://"+location.host+"/api/v1/live/ws");state.socket=socket;
  socket.onopen=()=>{if(generation!==state.socketGeneration)return;$("feedState").textContent="LIVE";$("engineLabel").textContent="Live Binance stream connected";$("engineStatus").textContent="Streaming";health("wsHealth","Connected",true)};
- socket.onmessage=message=>{if(generation!==state.socketGeneration)return;try{const event=JSON.parse(message.data);if(event.type==="connected"||event.type==="heartbeat")return;handleLiveEvent(event)}catch(error){}};
+ socket.onmessage=message=>{if(generation!==state.socketGeneration)return;try{const event=JSON.parse(message.data);if(event.type==="connected"){const connected=!!event.status?.connected;$("feedState").textContent=connected?"LIVE":"CONNECTING";return}if(event.type==="heartbeat"){const connected=!!event.status?.connected;$("feedState").textContent=connected?"LIVE":"RECONNECTING";$("engineLabel").textContent=connected?"Live Binance stream connected":"Reconnecting to Binance market stream";health("wsHealth",connected?"Connected":"Reconnecting",connected);return}handleLiveEvent(event)}catch(error){}};
  socket.onerror=()=>{if(generation===state.socketGeneration)health("wsHealth","Connection issue",false)};
  socket.onclose=()=>{if(generation!==state.socketGeneration)return;$("feedState").textContent="Reconnecting";health("wsHealth","Reconnecting",false);clearTimeout(state.retryTimer);state.retryTimer=setTimeout(()=>{if(generation===state.socketGeneration)connectSocket(generation)},1800)};
 }
@@ -194,6 +194,13 @@ async function checkForNexoraUpdate(){
  }finally{updatePollBusy=false}
 }
 
+function refreshBookFreshness(){
+ if(!state.bookLastUpdateAt)return;
+ const stale=Date.now()-state.bookLastUpdateAt>5000;
+ $("depthStatus").textContent=stale?"STALE":"LIVE";
+ $("depthStatus").classList.toggle("live-tag",!stale);
+}
+
 function init(){
  try{state.symbol=localStorage.getItem("nexora-selected-symbol")||state.symbol;state.interval=localStorage.getItem("nexora-selected-interval")||state.interval;const active=document.querySelector('[data-interval="'+state.interval+'"]');if(active){document.querySelectorAll("[data-interval]").forEach(item=>item.classList.remove("selected"));active.classList.add("selected")}}catch(error){}
  $("searchPairBtn").addEventListener("click",searchPair);$("pairSearch").addEventListener("keydown",event=>{if(event.key==="Enter")searchPair()});
@@ -204,7 +211,7 @@ function init(){
  }));
  $("refreshBtn").addEventListener("click",()=>{loadSymbols().then(()=>{loadCandles();startLive()})});
  $("updateToastClose")?.addEventListener("click",()=>$("updateToast").classList.add("hidden"));
- checkForNexoraUpdate();setInterval(checkForNexoraUpdate,30000);
+ checkForNexoraUpdate();setInterval(checkForNexoraUpdate,30000);setInterval(refreshBookFreshness,1000);
  window.addEventListener("resize",()=>{clearTimeout(state.resizeTimer);state.resizeTimer=setTimeout(drawChart,100)});
  api("/health").then(()=>{health("localHealth","Online",true);$("engineLabel").textContent="Local engine online"}).catch(()=>health("localHealth","Offline",false));
  loadSymbols().then(()=>{if(!state.symbols.length)return;$("pairSearch").value=state.symbol;selectSymbol(state.symbol)});
