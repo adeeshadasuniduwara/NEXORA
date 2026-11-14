@@ -1,5 +1,5 @@
 const API="/api/v1";
-const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],analysis:null,view:{end:0,visible:120,follow:true},indicators:{ema20:true,ema50:true,sma200:false,bb:false,rsi:true},drawTool:"cursor",drawings:[],draft:null,position:null,dragging:null,socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]}};
+const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],analysis:null,view:{end:0,visible:120,follow:true},indicators:{ema20:true,ema50:true,sma200:false,bb:false,rsi:true},confirmations:{structure:true,fvg:true,ob:true,liquidity:true,eq:true,ema:true,rsi:true,volume:false},drawTool:"cursor",drawings:[],draft:null,position:null,dragging:null,socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]}};
 const $=id=>document.getElementById(id);
 const fmt=(v,max=8)=>Number(v||0).toLocaleString("en-US",{maximumFractionDigits:max});
 const compact=v=>{const n=Number(v||0);return n>=1e9?(n/1e9).toFixed(2)+"B":n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(2)+"K":fmt(n,2)};
@@ -56,6 +56,11 @@ function calculateAnalysis(){
   if(lows[i]>highs[i-2])fvgs.push({type:"Bullish FVG",low:highs[i-2],high:lows[i],index:i,bearish:false});
   else if(highs[i]<lows[i-2])fvgs.push({type:"Bearish FVG",low:highs[i],high:lows[i-2],index:i,bearish:true});
  }
+ const sweeps=[];
+ if(lastHigh&&highs[n-1]>lastHigh.price&&last<lastHigh.price)sweeps.push({type:"Bearish liquidity sweep",price:lastHigh.price,bearish:true,index:n-1});
+ if(lastLow&&lows[n-1]<lastLow.price&&last>lastLow.price)sweeps.push({type:"Bullish liquidity sweep",price:lastLow.price,bearish:false,index:n-1});
+ const orderBlocks=[];
+ if(breakEvent){const bullish=!breakEvent.bearish;for(let i=n-2;i>=Math.max(0,n-12);i--){const down=closes[i]<Number(candles[i].open),up=closes[i]>Number(candles[i].open);if((bullish&&down)||(!bullish&&up)){orderBlocks.push({type:bullish?"Bullish order block":"Bearish order block",low:lows[i],high:highs[i],index:i,bearish:!bullish});break}}}
  const equalTolerance=last*0.001;
  const equalHigh=swingHighs.slice(-12).find((p,i,arr)=>arr.slice(i+1).some(q=>Math.abs(q.price-p.price)<=equalTolerance));
  const equalLow=swingLows.slice(-12).find((p,i,arr)=>arr.slice(i+1).some(q=>Math.abs(q.price-p.price)<=equalTolerance));
@@ -66,7 +71,7 @@ function calculateAnalysis(){
  if(structure==="BULLISH STRUCTURE")score++;else if(structure==="BEARISH STRUCTURE")score--;
  if(breakEvent)score+=breakEvent.bearish?-1:1;
  const bias=score>=2?"BULLISH":score<=-2?"BEARISH":"NEUTRAL";
- state.analysis={ema20,ema50,rsi,structure,structureDetail,events,fvgs:fvgs,liquidity:{equalHigh,equalLow},bias,score,last};
+ state.analysis={ema20,ema50,rsi,structure,structureDetail,events,fvgs:fvgs,orderBlocks,sweeps,liquidity:{equalHigh,equalLow},bias,score,last};
  renderAnalysis();
 }
 function renderAnalysis(){
@@ -86,6 +91,7 @@ function renderAnalysis(){
  const eventRows=a.events.slice(0,4);
  if(!eventRows.length)eventHost.textContent="No confirmed swing events in the current window.";
  eventRows.forEach(item=>{const row=document.createElement("div");row.className="analysis-event";const name=document.createElement("b");name.textContent=item.name;if(item.bearish)name.classList.add("bearish");const value=document.createElement("span");value.textContent=fmt(item.price);row.append(name,value);eventHost.appendChild(row)});
+ const extra=[...a.sweeps,...a.orderBlocks];extra.slice(-4).forEach(item=>{const row=document.createElement("div");row.className="analysis-event";const name=document.createElement("b");name.textContent=item.type;if(item.bearish)name.classList.add("bearish");const value=document.createElement("span");value.textContent=fmt(item.price??item.low)+" – "+fmt(item.high??item.price);row.append(name,value);eventHost.appendChild(row)});
  const fvgHost=$("fvgEvents");fvgHost.replaceChildren();
  if(!a.fvgs.length)fvgHost.textContent="No recent three-candle imbalance detected.";
  a.fvgs.slice(-4).reverse().forEach(item=>{const row=document.createElement("div");row.className="analysis-event";const name=document.createElement("b");name.textContent=item.type;if(item.bearish)name.classList.add("bearish");const value=document.createElement("span");value.textContent=fmt(item.low)+" – "+fmt(item.high);row.append(name,value);fvgHost.appendChild(row)});
@@ -136,7 +142,7 @@ function drawChart(){
  if(state.indicators.ema20)line(ema20,"#e9c46a");if(state.indicators.ema50)line(ema50,"#76b9e8");if(state.indicators.sma200)line(sma200,"#c79bff");
  if(state.indicators.bb){line(mid,"#9ba9bb",[4,3]);line(mid.map((v,i)=>v===null?null:v+2*(sd[i]||0)),"#8294a866",[3,3]);line(mid.map((v,i)=>v===null?null:v-2*(sd[i]||0)),"#8294a866",[3,3])}
  const a=state.analysis;
- if(a){a.fvgs.slice(-20).forEach(z=>{const xx=x(z.index);if(xx<pad.left||xx>width-pad.right)return;ctx.fillStyle=z.bearish?"#f17e8c19":"#70e5bd19";ctx.strokeStyle=z.bearish?"#f17e8c66":"#70e5bd66";const top=y(z.high),bottom=y(z.low),w=Math.max(1,width-pad.right-xx),h=Math.max(2,bottom-top);ctx.fillRect(xx,top,w,h);ctx.strokeRect(xx,top,w,h)})}
+ if(a){if(state.confirmations.fvg)a.fvgs.slice(-20).forEach(z=>{const xx=x(z.index);if(xx<pad.left||xx>width-pad.right)return;ctx.fillStyle=z.bearish?"#f17e8c19":"#70e5bd19";ctx.strokeStyle=z.bearish?"#f17e8c66":"#70e5bd66";const top=y(z.high),bottom=y(z.low),w=Math.max(1,width-pad.right-xx),h=Math.max(2,bottom-top);ctx.fillRect(xx,top,w,h);ctx.strokeRect(xx,top,w,h)});if(state.confirmations.ob)a.orderBlocks.slice(-6).forEach(z=>{const xx=x(z.index);ctx.fillStyle=z.bearish?"#f17e8c22":"#70e5bd22";ctx.strokeStyle=z.bearish?"#f17e8c88":"#70e5bd88";ctx.fillRect(xx,y(z.high),Math.max(1,width-pad.right-xx),Math.max(2,y(z.low)-y(z.high)));ctx.strokeRect(xx,y(z.high),Math.max(1,width-pad.right-xx),Math.max(2,y(z.low)-y(z.high)))});if(state.confirmations.structure&&a.events[0]){const e=a.events[0];ctx.fillStyle=e.bearish?"#f17e8c":"#70e5bd";ctx.font="9px DM Mono";ctx.textAlign="left";ctx.fillText(e.name,pad.left+5,y(e.price)-7)}}
  state.drawings.forEach(d=>drawManualMark(ctx,d,x,y,pad,width,height));
  if(position&&position.symbol===state.symbol)drawPosition(ctx,position,y,pad,width);
  const last=data.at(-1),lastY=y(+last.close);ctx.setLineDash([4,4]);ctx.strokeStyle="#70e5bd88";ctx.beginPath();ctx.moveTo(pad.left,lastY);ctx.lineTo(width-pad.right,lastY);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#173d36";ctx.fillRect(width-pad.right+4,lastY-9,74,18);ctx.fillStyle="#a2f4d9";ctx.textAlign="center";ctx.fillText(fmt(last.close),width-pad.right+41,lastY+3);
@@ -361,7 +367,7 @@ function bindChartTools(){
   state.drawTool=btn.dataset.draw;document.querySelectorAll("[data-draw]").forEach(b=>b.classList.toggle("tool-active",b===btn));
  }));
  document.querySelectorAll("[data-indicator]").forEach(input=>input.addEventListener("change",()=>{state.indicators[input.dataset.indicator]=input.checked;drawChart()}));
- document.querySelectorAll("[data-confirm]").forEach(input=>input.addEventListener("change",()=>{if(state.position)renderTradeDesk()}));
+ document.querySelectorAll("[data-confirm]").forEach(input=>{state.confirmations[input.dataset.confirm]=input.checked;input.addEventListener("change",()=>{state.confirmations[input.dataset.confirm]=input.checked;drawChart();if(state.position)renderTradeDesk()})});
  document.querySelectorAll("[data-pack]").forEach(btn=>btn.addEventListener("click",()=>{
   if(btn.dataset.pack!=="smc")return;
   document.querySelectorAll("[data-pack]").forEach(b=>b.classList.toggle("selected",b===btn));
