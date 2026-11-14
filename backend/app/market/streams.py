@@ -1,4 +1,4 @@
-"""Resilient Binance combined-stream client for live market events."""
+"""Resilient Binance Spot combined-stream client for live market events."""
 from __future__ import annotations
 
 import asyncio
@@ -15,29 +15,35 @@ LOG = logging.getLogger(__name__)
 WS_BASE = "wss://stream.binance.com:9443/stream?streams="
 
 EventHandler = Callable[[dict[str, Any]], Awaitable[None]]
+SUPPORTED_INTERVALS = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 
 
 def stream_names(symbols: Iterable[str], intervals: Iterable[str] = ("1m",)) -> list[str]:
-    names: list[str] = []
+    """Subscribe to all-market ticker snapshots plus detailed streams for selected symbols.
+
+    The global !ticker@arr stream keeps every Binance Spot pair discoverable/live without
+    opening thousands of per-symbol sockets. Detailed depth/trade/kline streams are limited
+    to the actively selected symbol(s) to keep bandwidth and browser work bounded.
+    """
+    names: list[str] = ["!ticker@arr"]
     for symbol in symbols:
         normalized = symbol.strip().lower()
         if not normalized or not normalized.isalnum():
             raise ValueError(f"Invalid Binance symbol: {symbol!r}")
         for interval in intervals:
-            if interval not in {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}:
+            if interval not in SUPPORTED_INTERVALS:
                 raise ValueError(f"Unsupported kline interval: {interval}")
             names.append(f"{normalized}@kline_{interval}")
-        names.extend((f"{normalized}@trade", f"{normalized}@bookTicker"))
+        names.extend((
+            f"{normalized}@trade",
+            f"{normalized}@bookTicker",
+            f"{normalized}@depth20@100ms",
+        ))
     return sorted(set(names))
 
 
 class BinanceStreamClient:
-    """Reconnectable consumer of Binance combined streams.
-
-    A new connection is established after disconnects. The consumer callback
-    receives decoded Binance event payloads; persistence/backfill is delegated
-    to the application service so network I/O stays independently testable.
-    """
+    """Reconnectable consumer of Binance combined streams."""
 
     def __init__(
         self,
@@ -101,10 +107,15 @@ class BinanceStreamClient:
                             break
                         try:
                             envelope = json.loads(raw)
-                            payload = envelope.get("data", envelope)
-                            if isinstance(payload, dict):
+                            stream = envelope.get("stream") if isinstance(envelope, dict) else None
+                            payload = envelope.get("data", envelope) if isinstance(envelope, dict) else envelope
+                            if isinstance(payload, list):
+                                await self.on_event({"e": "tickerArray", "data": payload})
+                            elif isinstance(payload, dict):
+                                if stream and "@depth20@" in stream:
+                                    payload["_stream"] = stream
                                 await self.on_event(payload)
-                                self.last_event_at = asyncio.get_running_loop().time()
+                            self.last_event_at = asyncio.get_running_loop().time()
                         except (json.JSONDecodeError, TypeError, ValueError) as exc:
                             self.last_error = f"invalid_event: {exc}"
                             LOG.warning("Ignoring malformed Binance event: %s", exc)
