@@ -96,7 +96,7 @@ def restart_workspace(root: Path) -> None:
     if os.name == "nt" and launcher.exists():
         flags = getattr(subprocess, "DETACHED_PROCESS", 0x00000008) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
         subprocess.Popen(
-            ["cmd.exe", "/c", str(launcher)], cwd=root, stdin=subprocess.DEVNULL,
+            ["cmd.exe", "/c", `set "NEXORA_NO_BROWSER=1" && call "${launcher}"`], cwd=root, stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags,
         )
     else:
