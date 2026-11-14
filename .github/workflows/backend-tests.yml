@@ -4,9 +4,15 @@ on:
   pull_request:
     paths:
       - "backend/**"
+      - "VERSION"
+      - "START_NEXORA.bat"
+      - "docs/**"
       - ".github/workflows/backend-tests.yml"
   push:
     branches: [main]
+
+permissions:
+  contents: write
 
 jobs:
   test:
@@ -23,3 +29,32 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
       - run: PYTHONPATH=. pytest -q
+
+  publish-release:
+    name: Publish automatic updater release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Build update archive and checksum
+        id: release
+        shell: bash
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must use semantic versioning (for example 0.6.0)." >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          git archive --format=zip --output=nexora-update.zip HEAD backend/app backend/requirements.txt START_NEXORA.bat VERSION docs
+          sha256sum nexora-update.zip | awk '{print $1}' > nexora-update.zip.sha256
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.release.outputs.version }}" nexora-update.zip nexora-update.zip.sha256 \
+            --title "NEXORA ${{ steps.release.outputs.version }}" \
+            --generate-notes

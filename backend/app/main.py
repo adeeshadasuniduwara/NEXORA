@@ -7,16 +7,19 @@ from fastapi.staticfiles import StaticFiles
 from app.routes.history import router as history_router
 from app.routes.live import router as live_router
 from app.routes.market import router as market_router
+from app.routes.system import router as system_router
+from app.version import APP_VERSION
 
 app = FastAPI(
     title="NEXORA",
-    version="0.5.0",
+    version=APP_VERSION,
     description="Live Binance Spot market terminal with all-market ticker discovery, selected-pair depth, and chart analysis.",
 )
 
 app.include_router(market_router, prefix="/api/v1")
 app.include_router(history_router, prefix="/api/v1")
 app.include_router(live_router, prefix="/api/v1")
+app.include_router(system_router, prefix="/api/v1")
 
 static_dir = Path(__file__).parent / "static"
 app.mount("/assets", StaticFiles(directory=static_dir), name="assets")

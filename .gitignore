@@ -14,3 +14,7 @@ dist/
 coverage/
 *.sqlite3
 *.db
+
+# NEXORA automatic updater state and rollback files
+.nexora_update_state.json
+.nexora_updates/

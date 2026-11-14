@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.routes.system import router as system_router
 
 
 def test_workspace_home_redirects_to_local_ui():
@@ -19,4 +20,12 @@ def test_workspace_assets_are_served():
     assert "NEXORA" in page.text
     assert script.status_code == 200
     assert "candleChart" in script.text
+    assert "checkForNexoraUpdate" in script.text
+    assert "updateToast" in page.text
     assert styles.status_code == 200
+
+
+def test_system_update_endpoints_are_registered():
+    paths = {route.path for route in system_router.routes}
+    assert "/system/update" in paths
+    assert "/system/update/apply" in paths
