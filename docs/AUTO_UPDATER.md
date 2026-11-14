@@ -1,35 +1,29 @@
-# NEXORA Windows launcher
+# NEXORA Windows launcher and automatic updates
 
-Run `START_NEXORA.bat` from the repository root. It checks for Python 3.10+, creates an isolated backend virtual environment, repairs pip dependencies with retries, runs `pip check`, starts FastAPI, and opens the local browser workspace.
+Run `START_NEXORA.bat` from the repository root. It checks for Python 3.10+, creates or repairs the isolated backend environment, installs requirements, and starts FastAPI in the same Command Prompt window.
 
 ## Central automatic updates
 
-The launcher no longer performs a silent Git pull at startup. Updates are controlled by the in-app GitHub Releases updater so every installation follows the same release and notification flow.
-
-- The browser checks `/api/v1/system/update` every 60 seconds.
-- GitHub Actions publishes a versioned release only after the backend tests pass on `main`.
+- The browser checks the GitHub Releases updater endpoint every 30 seconds.
+- GitHub Actions publishes a versioned release only after backend tests pass on `main`.
 - The updater downloads `nexora-update.zip` and its SHA-256 checksum over HTTPS and verifies the archive before installation.
-- A detached helper waits for the current server to exit, applies the update, records its version/time/release notes, and starts NEXORA again.
-- After reconnecting, the browser displays the update version, release notes, and local installation time.
+- A small background Python helper waits for the running API process to exit and applies the verified update. It does not open another CMD window or launch another server.
+- The original `START_NEXORA.bat` detects the update marker, waits for installation to finish, checks updated dependencies, and starts Uvicorn again in that same original CMD window.
+- The browser tab stays open and reconnects to the restarted local server; no second browser tab is opened.
+- Update status, version, release notes, and local installation time are recorded in `.nexora_update_state.json`.
 
 ### Installation types
 
-- **Git clone:** the updater verifies that the working tree is clean, then uses a fast-forward pull from `origin/main`. If local changes are present, it refuses to overwrite them.
-- **Repository ZIP:** the updater applies only allowlisted app, requirements, launcher and documentation files. It does not package the local database or data folders.
+- **Git clone:** the updater requires a clean working tree on `main` and fast-forward updates from `origin/main`.
+- **Repository ZIP:** the updater safely replaces only allowlisted application, requirements, launcher, version, and documentation files. Local databases and data folders are preserved.
 
-Every release must increment the semantic version in both `VERSION` and `backend/app/version.py`. GitHub Actions deliberately fails if a release tag already exists. Do not reuse an existing version for a different update.
+Every release must increment both `VERSION` and `backend/app/version.py`. GitHub Actions intentionally fails if a release tag already exists.
 
-### What users will see
+## Recovery and resource behavior
 
-1. A short notification that a new version has been found and is being installed.
-2. NEXORA briefly restarts automatically.
-3. After the browser reconnects, a notification shows **Updated to vX.Y.Z**, the change notes and the exact local update time.
+The original CMD window owns the server lifecycle. During an update, the API process stops briefly, the helper applies files, and the same launcher CMD restarts the server. No additional CMD or PowerShell console window is created for the restart. A hidden one-shot PowerShell process is used only at initial launch to open the browser tab.
 
-If GitHub is unreachable, the existing app keeps running and retries later. If the update archive checksum is invalid, installation is cancelled. A Git clone with local modifications is protected rather than force-reset.
-
-## Recovery
-
-The launcher attempts to recreate a broken virtual environment and retries dependency installation using pip cache purge, no-cache mode, extended timeout and retries. It cannot repair missing Windows system components, blocked network access, incompatible hardware, or third-party antivirus/firewall restrictions; those are reported.
+If installation fails, the helper records the error and releases the pending marker; the original launcher restarts the previous working server where possible. The launcher waits up to 180 seconds for the helper before reporting a timeout.
 
 ## Workspace and safety
 
