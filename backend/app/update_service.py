@@ -7,6 +7,7 @@ helper so the running server can exit cleanly before files are replaced.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import signal
@@ -142,12 +143,17 @@ def begin_update() -> dict[str, Any]:
             }
 
     archive_path = _download_verified_archive(release)
+    manifest_path = archive_path.with_suffix(".json")
+    manifest_path.write_text(json.dumps({
+        "version": release["latest_version"],
+        "tag": release["tag"],
+        "published_at": release.get("published_at") or "",
+        "release_notes": release.get("release_notes") or "",
+    }, ensure_ascii=False), encoding="utf-8")
     helper = Path(__file__).with_name("update_helper.py")
     command = [
         sys.executable, str(helper), "--root", str(root), "--archive", str(archive_path),
-        "--parent-pid", str(os.getpid()), "--version", str(release["latest_version"]),
-        "--tag", str(release["tag"]), "--published-at", str(release.get("published_at") or ""),
-        "--notes", str(release.get("release_notes") or ""),
+        "--manifest", str(manifest_path), "--parent-pid", str(os.getpid()),
     ]
     creation_flags = 0
     if os.name == "nt":
