@@ -1,5 +1,5 @@
 :root{color-scheme:dark;--bg:#080d16;--panel:#101a29;--line:#243349;--muted:#8190a6;--text:#e9f0fa;--mint:#70e5bd;--red:#f17e8c;--blue:#76b9e8}
-*{box-sizing:border-box}
+*{box-sizing:border-box}.hidden{display:none!important}
 body{margin:0;min-height:100vh;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:Manrope,system-ui,sans-serif}
 button,input{font:inherit}
 .ambient{position:fixed;width:560px;height:560px;border-radius:50%;filter:blur(135px);opacity:.12;pointer-events:none;z-index:-1;animation:float 14s ease-in-out infinite alternate}
