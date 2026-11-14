@@ -29,3 +29,18 @@ def test_system_update_endpoints_are_registered():
     paths = {route.path for route in system_router.routes}
     assert "/system/update" in paths
     assert "/system/update/apply" in paths
+
+
+def test_chart_analysis_panel_and_engine_are_served():
+    client = TestClient(app)
+    page = client.get("/assets/index.html").text
+    script = client.get("/assets/app.js").text
+    styles = client.get("/assets/styles.css").text
+
+    assert 'id="analysisPanel"' in page
+    assert 'id="analysisBias"' in page
+    assert "calculateAnalysis" in script
+    assert "Bullish FVG" in script
+    assert "Bearish CHoCH" in script
+    assert "analysis.fvgs" in script
+    assert ".analysis-grid" in styles

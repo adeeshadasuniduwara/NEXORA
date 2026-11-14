@@ -1,5 +1,5 @@
 const API="/api/v1";
-const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]}};
+const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],analysis:null,socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]}};
 const $=id=>document.getElementById(id);
 const fmt=(v,max=8)=>Number(v||0).toLocaleString("en-US",{maximumFractionDigits:max});
 const compact=v=>{const n=Number(v||0);return n>=1e9?(n/1e9).toFixed(2)+"B":n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(2)+"K":fmt(n,2)};
@@ -10,10 +10,85 @@ async function loadCandles(){
  $("chartLoading").classList.remove("hidden");
  try{
   const data=await api(`${API}/market/candles?symbol=${encodeURIComponent(state.symbol)}&interval=${state.interval}&limit=220`);
-  state.candles=data.candles||[];drawChart();$("chartLoading").classList.add("hidden");
+  state.candles=data.candles||[];calculateAnalysis();drawChart();$("chartLoading").classList.add("hidden");
   const candle=state.candles.at(-1);if(candle){setPrice(candle.close);$("priceFoot").textContent="Latest Binance candle"}
   health("restHealth","Connected",true);
  }catch(error){$("chartLoading").innerHTML="<span>Market history unavailable — check connection and retry.</span>";health("restHealth","Offline",false)}
+}
+function ema(values,period){
+ if(values.length<period)return null;
+ const multiplier=2/(period+1);let value=values.slice(0,period).reduce((a,b)=>a+b,0)/period;
+ for(let i=period;i<values.length;i++)value=(values[i]-value)*multiplier+value;
+ return value;
+}
+function calculateAnalysis(){
+ const candles=state.candles,n=candles.length;
+ if(n<55){state.analysis=null;renderAnalysis();return}
+ const highs=candles.map(c=>Number(c.high)),lows=candles.map(c=>Number(c.low)),closes=candles.map(c=>Number(c.close));
+ const ema20=ema(closes,20),ema50=ema(closes,50),last=closes.at(-1);
+ let gains=0,losses=0;
+ for(let i=n-14;i<n;i++){const change=closes[i]-closes[i-1];if(change>0)gains+=change;else losses-=change}
+ const rs=losses===0?Infinity:(gains/14)/(losses/14),rsi=losses===0?100:100-(100/(1+rs));
+ const swingHighs=[],swingLows=[];
+ for(let i=2;i<n-2;i++){
+  if(highs[i]>highs[i-1]&&highs[i]>highs[i-2]&&highs[i]>=highs[i+1]&&highs[i]>=highs[i+2])swingHighs.push({index:i,price:highs[i]});
+  if(lows[i]<lows[i-1]&&lows[i]<lows[i-2]&&lows[i]<=lows[i+1]&&lows[i]<=lows[i+2])swingLows.push({index:i,price:lows[i]});
+ }
+ const recentHighs=swingHighs.slice(-2),recentLows=swingLows.slice(-2);
+ let structure="RANGING",structureDetail="Waiting for a clear sequence of confirmed swing highs and lows";
+ if(recentHighs.length===2&&recentLows.length===2){
+  const hh=recentHighs[1].price>recentHighs[0].price,hl=recentLows[1].price>recentLows[0].price;
+  const lh=recentHighs[1].price<recentHighs[0].price,ll=recentLows[1].price<recentLows[0].price;
+  if(hh&&hl)structure="BULLISH STRUCTURE";
+  else if(lh&&ll)structure="BEARISH STRUCTURE";
+  structureDetail=(hh?"Higher high":lh?"Lower high":"No higher/lower high")+" · "+(hl?"Higher low":ll?"Lower low":"No higher/lower low");
+ }
+ const events=[];
+ if(recentHighs.length){const h=recentHighs.at(-1);events.push({name:"Swing high",price:h.price,index:h.index,bearish:false})}
+ if(recentLows.length){const l=recentLows.at(-1);events.push({name:"Swing low",price:l.price,index:l.index,bearish:true})}
+ const previous=closes[n-2],lastHigh=swingHighs.at(-1),lastLow=swingLows.at(-1);
+ let breakEvent=null;
+ if(lastHigh&&n-1>lastHigh.index&&last>lastHigh.price&&previous<=lastHigh.price)breakEvent={name:structure==="BEARISH STRUCTURE"?"Bullish CHoCH":"Bullish BOS",price:lastHigh.price,bearish:false};
+ else if(lastLow&&n-1>lastLow.index&&last<lastLow.price&&previous>=lastLow.price)breakEvent={name:structure==="BULLISH STRUCTURE"?"Bearish CHoCH":"Bearish BOS",price:lastLow.price,bearish:true};
+ if(breakEvent)events.unshift(breakEvent);
+ const fvgs=[];
+ for(let i=Math.max(2,n-30);i<n;i++){
+  if(lows[i]>highs[i-2])fvgs.push({type:"Bullish FVG",low:highs[i-2],high:lows[i],index:i,bearish:false});
+  else if(highs[i]<lows[i-2])fvgs.push({type:"Bearish FVG",low:highs[i],high:lows[i-2],index:i,bearish:true});
+ }
+ const equalTolerance=last*0.001;
+ const equalHigh=swingHighs.slice(-12).find((p,i,arr)=>arr.slice(i+1).some(q=>Math.abs(q.price-p.price)<=equalTolerance));
+ const equalLow=swingLows.slice(-12).find((p,i,arr)=>arr.slice(i+1).some(q=>Math.abs(q.price-p.price)<=equalTolerance));
+ let score=0;
+ if(ema20>ema50)score++;else score--;
+ if(last>ema20)score++;else score--;
+ if(rsi>=55)score++;else if(rsi<=45)score--;
+ if(structure==="BULLISH STRUCTURE")score++;else if(structure==="BEARISH STRUCTURE")score--;
+ if(breakEvent)score+=breakEvent.bearish?-1:1;
+ const bias=score>=2?"BULLISH":score<=-2?"BEARISH":"NEUTRAL";
+ state.analysis={ema20,ema50,rsi,structure,structureDetail,events,fvgs:fvgs,liquidity:{equalHigh,equalLow},bias,score,last};
+ renderAnalysis();
+}
+function renderAnalysis(){
+ const a=state.analysis;
+ if(!a){$("analysisState").textContent="NEED MORE DATA";$("analysisBias").textContent="—";$("analysisReason").textContent="At least 55 candles are required for stable EMA 50 analysis.";$("analysisScore").textContent="—";$("analysisScoreLabel").textContent="Not enough data";return}
+ $("analysisState").textContent="UPDATED · "+state.interval.toUpperCase();
+ $("analysisBias").textContent=a.bias;$("analysisBias").className=a.bias==="BULLISH"?"bullish":a.bias==="BEARISH"?"bearish":"";
+ $("analysisReason").textContent="Based on EMA alignment, RSI, confirmed swing structure and the latest candle.";
+ $("analysisScore").textContent=(a.score>0?"+":"")+a.score+"/5";$("analysisScoreLabel").textContent=a.score>=2?"Bullish confluence":a.score<=-2?"Bearish confluence":"Mixed conditions";
+ $("analysisStructure").textContent=a.structure;$("analysisStructureDetail").textContent=a.structureDetail;
+ $("analysisEma").textContent=a.ema20>a.ema50?"EMA 20 above 50":"EMA 20 below 50";$("analysisEmaDetail").textContent="20: "+fmt(a.ema20)+" · 50: "+fmt(a.ema50);
+ $("analysisRsi").textContent=a.rsi.toFixed(1);$("analysisRsiDetail").textContent=a.rsi>=70?"Overbought zone":a.rsi<=30?"Oversold zone":a.rsi>=50?"Above midpoint":"Below midpoint";
+ const highs=a.liquidity.equalHigh,lows=a.liquidity.equalLow;
+ $("analysisLiquidity").textContent=(highs?"EQH":"")+(highs&&lows?" / ":"")+(lows?"EQL":"")||"No equal levels";
+ $("analysisLiquidityDetail").textContent=(highs?"EQH near "+fmt(highs.price):"No confirmed EQH")+" · "+(lows?"EQL near "+fmt(lows.price):"No confirmed EQL");
+ const eventHost=$("structureEvents");eventHost.replaceChildren();
+ const eventRows=a.events.slice(0,4);
+ if(!eventRows.length)eventHost.textContent="No confirmed swing events in the current window.";
+ eventRows.forEach(item=>{const row=document.createElement("div");row.className="analysis-event";const name=document.createElement("b");name.textContent=item.name;if(item.bearish)name.classList.add("bearish");const value=document.createElement("span");value.textContent=fmt(item.price);row.append(name,value);eventHost.appendChild(row)});
+ const fvgHost=$("fvgEvents");fvgHost.replaceChildren();
+ if(!a.fvgs.length)fvgHost.textContent="No recent three-candle imbalance detected.";
+ a.fvgs.slice(-4).reverse().forEach(item=>{const row=document.createElement("div");row.className="analysis-event";const name=document.createElement("b");name.textContent=item.type;if(item.bearish)name.classList.add("bearish");const value=document.createElement("span");value.textContent=fmt(item.low)+" – "+fmt(item.high);row.append(name,value);fvgHost.appendChild(row)});
 }
 function drawChart(){
  const canvas=$("candleChart"),ctx=canvas.getContext("2d"),rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
@@ -25,12 +100,18 @@ function drawChart(){
  ctx.font="10px DM Mono";ctx.textAlign="right";ctx.strokeStyle="#243247";ctx.fillStyle="#8795a9";
  for(let i=0;i<=4;i++){const yy=pad.top+chartH*i/4;ctx.beginPath();ctx.moveTo(pad.left,yy);ctx.lineTo(width-pad.right,yy);ctx.stroke();ctx.fillText(fmt(high-range*i/4),width-5,yy+3)}
  data.forEach((c,index)=>{const x=pad.left+step*(index+.5),up=+c.close>=+c.open,color=up?"#70e5bd":"#f17e8c",top=Math.min(y(+c.open),y(+c.close)),bodyH=Math.max(1,Math.abs(y(+c.open)-y(+c.close)));ctx.strokeStyle=color;ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(x,y(+c.high));ctx.lineTo(x,y(+c.low));ctx.stroke();ctx.fillRect(x-bodyW/2,top,bodyW,bodyH)});
+ const analysis=state.analysis;
+ if(analysis){
+  analysis.fvgs.slice(-5).forEach(zone=>{const x=pad.left+step*(zone.index+.5),top=y(zone.high),bottom=y(zone.low);ctx.fillStyle=zone.bearish?"#f17e8c18":"#70e5bd18";ctx.strokeStyle=zone.bearish?"#f17e8c66":"#70e5bd66";ctx.fillRect(x,top,Math.max(1,width-pad.right-x),Math.max(2,bottom-top));ctx.strokeRect(x,top,Math.max(1,width-pad.right-x),Math.max(2,bottom-top))});
+  const levels=[{item:analysis.events.find(e=>e.name==="Swing high"),label:"SH"},{item:analysis.events.find(e=>e.name==="Swing low"),label:"SL"}];
+  levels.forEach(({item,label})=>{if(!item)return;const yy=y(item.price);ctx.setLineDash([3,4]);ctx.strokeStyle="#93a9c577";ctx.beginPath();ctx.moveTo(pad.left,yy);ctx.lineTo(width-pad.right,yy);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#aabbd0";ctx.textAlign="left";ctx.fillText(label,pad.left+3,yy-4)});
+ }
  const last=data.at(-1),lastY=y(+last.close);ctx.setLineDash([4,4]);ctx.strokeStyle="#70e5bd88";ctx.beginPath();ctx.moveTo(pad.left,lastY);ctx.lineTo(width-pad.right,lastY);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#173d36";ctx.fillRect(width-pad.right+4,lastY-9,70,18);ctx.fillStyle="#a2f4d9";ctx.textAlign="center";ctx.fillText(fmt(last.close),width-pad.right+39,lastY+3);
 }
 function updateCandle(k){
  const candle={open_time:k.t,open:k.o,high:k.h,low:k.l,close:k.c,volume:k.v},last=state.candles.at(-1);
  if(last&&Number(last.open_time)===Number(candle.open_time))state.candles[state.candles.length-1]=candle;else state.candles.push(candle);
- if(state.candles.length>220)state.candles.shift();drawChart();setPrice(candle.close);
+ if(state.candles.length>220)state.candles.shift();calculateAnalysis();drawChart();setPrice(candle.close);
 }
 async function loadSymbols(){
  try{
