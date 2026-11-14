@@ -172,8 +172,8 @@ async function checkForNexoraUpdate(){
    let seen=false;try{seen=localStorage.getItem(key)==="1"}catch(error){}
    if(!seen){
     const updatedAt=last.updated_at?new Date(last.updated_at).toLocaleString():"just now";
-    const notes=(last.release_notes||"New improvements and fixes are now installed.").trim().slice(0,700);
-    showUpdateToast("NEXORA updated to v"+last.version,notes,"Updated at "+updatedAt);
+    const notes=(last.status==="failed"?(last.error||"The update could not be installed. Your previous workspace was restarted."):((last.release_notes||"New improvements and fixes are now installed.").trim().slice(0,700)));
+    showUpdateToast(last.status==="failed"?"NEXORA update could not be installed":"NEXORA updated to v"+last.version,notes,(last.status==="failed"?"Attempted at ":"Updated at ")+updatedAt);
     try{localStorage.setItem(key,"1")}catch(error){}
    }
   }
