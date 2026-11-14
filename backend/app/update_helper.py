@@ -18,10 +18,18 @@ ALLOWED_PREFIXES = ("backend/app/", "backend/requirements.txt", "START_NEXORA.ba
 def wait_for_process(pid: int, timeout: int = 120) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        try:
-            os.kill(pid, 0)
-        except OSError:
-            return
+        if os.name == "nt":
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if str(pid) not in result.stdout:
+                return
+        else:
+            try:
+                os.kill(pid, 0)
+            except OSError:
+                return
         time.sleep(0.5)
     raise TimeoutError("NEXORA server process did not stop in time; update was not applied.")
 
@@ -95,8 +103,11 @@ def main() -> int:
     if os.name == "nt" and launcher.exists():
         flags = getattr(subprocess, "DETACHED_PROCESS", 0x00000008) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
         subprocess.Popen(["cmd.exe", "/c", str(launcher)], cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags)
-    elif launcher.exists():
-        subprocess.Popen(["bash", str(launcher)], cwd=root)
+    else:
+        subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+            cwd=root / "backend",
+        )
     return 0
 
 
