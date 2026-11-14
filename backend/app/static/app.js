@@ -102,8 +102,8 @@ function rsiSeries(values,period=14){
  let ag=gain/period,al=loss/period;out[period]=al===0?100:100-100/(1+ag/al);
  for(let i=period+1;i<values.length;i++){const d=values[i]-values[i-1];ag=(ag*(period-1)+Math.max(d,0))/period;al=(al*(period-1)+Math.max(-d,0))/period;out[i]=al===0?100:100-100/(1+ag/al)}return out;
 }
-function saveWorkspaceMarks(){try{localStorage.setItem("nexora-marks-"+state.symbol,JSON.stringify({drawings:state.drawings,position:state.position}))}catch(error){}}
-function loadWorkspaceMarks(){try{const saved=JSON.parse(localStorage.getItem("nexora-marks-"+state.symbol)||"{}");state.drawings=Array.isArray(saved.drawings)?saved.drawings:[];state.position=saved.position||null;renderTradeDesk()}catch(error){state.drawings=[];state.position=null}}
+function saveWorkspaceMarks(){try{localStorage.setItem("nexora-marks-"+state.symbol,JSON.stringify({drawings:state.drawings}));if(state.position)localStorage.setItem("nexora-active-position",JSON.stringify(state.position));else localStorage.removeItem("nexora-active-position")}catch(error){}}
+function loadWorkspaceMarks(){try{const saved=JSON.parse(localStorage.getItem("nexora-marks-"+state.symbol)||"{}");state.drawings=Array.isArray(saved.drawings)?saved.drawings:[];state.position=JSON.parse(localStorage.getItem("nexora-active-position")||"null");renderTradeDesk()}catch(error){state.drawings=[];state.position=null}}
 function chartMetrics(){
  const canvas=$("candleChart"),rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
  canvas.width=Math.max(1,Math.floor(rect.width*dpr));canvas.height=Math.max(1,Math.floor(rect.height*dpr));
@@ -138,7 +138,7 @@ function drawChart(){
  const a=state.analysis;
  if(a){a.fvgs.slice(-20).forEach(z=>{const xx=x(z.index);if(xx<pad.left||xx>width-pad.right)return;ctx.fillStyle=z.bearish?"#f17e8c19":"#70e5bd19";ctx.strokeStyle=z.bearish?"#f17e8c66":"#70e5bd66";const top=y(z.high),bottom=y(z.low),w=Math.max(1,width-pad.right-xx),h=Math.max(2,bottom-top);ctx.fillRect(xx,top,w,h);ctx.strokeRect(xx,top,w,h)})}
  state.drawings.forEach(d=>drawManualMark(ctx,d,x,y,pad,width,height));
- if(position)drawPosition(ctx,position,y,pad,width);
+ if(position&&position.symbol===state.symbol)drawPosition(ctx,position,y,pad,width);
  const last=data.at(-1),lastY=y(+last.close);ctx.setLineDash([4,4]);ctx.strokeStyle="#70e5bd88";ctx.beginPath();ctx.moveTo(pad.left,lastY);ctx.lineTo(width-pad.right,lastY);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#173d36";ctx.fillRect(width-pad.right+4,lastY-9,74,18);ctx.fillStyle="#a2f4d9";ctx.textAlign="center";ctx.fillText(fmt(last.close),width-pad.right+41,lastY+3);
  const rsiValues=closes;drawRsi(rsiValues);
 }
@@ -156,7 +156,7 @@ function drawManualMark(ctx,d,x,y,pad,width,height){
 }
 function priceAt(clientY){const rect=$("candleChart").getBoundingClientRect(),data=state.candles.slice(Math.max(0,(state.view.end||state.candles.length)-state.view.visible),state.view.end||state.candles.length);if(!data.length)return 0;const top=12,chartH=rect.height-(state.indicators.rsi?88:0)-34,lo=Math.min(...data.map(c=>+c.low)),hi=Math.max(...data.map(c=>+c.high)),range=hi-lo||1;return hi-(clientY-rect.top-top)/chartH*range}
 function createPosition(direction,price){
- const risk=price*.01,stop=direction==="LONG"?price-risk:price+risk,unit=Math.abs(price-stop);
+ const recent=state.candles.slice(-15),tr=recent.slice(1).map((c,i)=>Math.max(+c.high- +c.low,Math.abs(+c.high- +recent[i].close),Math.abs(+c.low- +recent[i].close))),atr=tr.length?tr.reduce((a,b)=>a+b,0)/tr.length:price*.01,risk=Math.max(atr*1.5,price*.001),stop=direction==="LONG"?price-risk:price+risk,unit=Math.abs(price-stop);
  state.position={direction,symbol:state.symbol,entry:price,stop,tp1:price+(direction==="LONG"?1:-1)*unit,tp2:price+(direction==="LONG"?2:-2)*unit,tp3:price+(direction==="LONG"?3:-3)*unit,createdAt:Date.now()};
  saveWorkspaceMarks();renderTradeDesk();drawChart();
 }
@@ -164,7 +164,7 @@ function renderTradeDesk(){
  const p=state.position,active=!!p;$("tradeDeskEmpty").classList.toggle("hidden",active);$("tradeDeskActive").classList.toggle("hidden",!active);$("tradeDeskStatus").textContent=active?"ONE ACTIVE SETUP":"NO ACTIVE SETUP";
  if(!p)return;$("deskDirection").textContent=p.direction+" · "+p.symbol;$("deskRiskReward").textContent="R:R 1:3";
  $("deskEntry").textContent=fmt(p.entry);$("deskStop").textContent=fmt(p.stop);$("deskTp1").textContent=fmt(p.tp1);$("deskTp2").textContent=fmt(p.tp2);$("deskTp3").textContent=fmt(p.tp3);
- const a=state.analysis,host=$("deskConfirmations");host.replaceChildren();const checks=[["EMA",a&&((p.direction==="LONG"&&a.ema20>a.ema50)||(p.direction==="SHORT"&&a.ema20<a.ema50))],["RSI",a&&(p.direction==="LONG"?a.rsi>50:a.rsi<50)],["Structure",a&&(p.direction==="LONG"?a.structure==="BULLISH STRUCTURE":a.structure==="BEARISH STRUCTURE")],["FVG",a&&a.fvgs.some(z=>!z.bearish=== (p.direction==="LONG"))]];
+ const a=state.analysis,host=$("deskConfirmations");host.replaceChildren();const recentVol=state.candles.slice(-20).map(c=>Number(c.volume||0)),volAvg=recentVol.length?recentVol.reduce((x,y)=>x+y,0)/recentVol.length:0,volOk=recentVol.length>1&&recentVol.at(-1)>volAvg;const checks=[["EMA",a&&((p.direction==="LONG"&&a.ema20>a.ema50)||(p.direction==="SHORT"&&a.ema20<a.ema50))],["RSI",a&&(p.direction==="LONG"?a.rsi>50:a.rsi<50)],["Structure",a&&(p.direction==="LONG"?a.structure==="BULLISH STRUCTURE":a.structure==="BEARISH STRUCTURE")],["FVG",a&&a.fvgs.some(z=>!z.bearish=== (p.direction==="LONG"))],["Volume",volOk]];
  checks.forEach(([name,ok])=>{const el=document.createElement("span");el.className=ok?"confirm-ok":"confirm-pending";el.textContent=(ok?"✓ ":"○ ")+name;host.appendChild(el)});
 }
 
