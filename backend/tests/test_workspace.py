@@ -19,4 +19,12 @@ def test_workspace_assets_are_served():
     assert "NEXORA" in page.text
     assert script.status_code == 200
     assert "candleChart" in script.text
+    assert "checkForNexoraUpdate" in script.text
+    assert "updateToast" in page.text
     assert styles.status_code == 200
+
+
+def test_system_update_endpoints_are_registered():
+    paths = {route.path for route in app.routes}
+    assert "/api/v1/system/update" in paths
+    assert "/api/v1/system/update/apply" in paths
