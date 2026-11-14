@@ -50,3 +50,8 @@ Historical candle availability depends on each symbol's listing history and Bina
 - No exchange trading credentials are required.
 - Never commit API keys, Telegram bot tokens, or `.env` files.
 - OpenAI integration, if enabled in a later release, may incur provider charges.
+
+
+## Chart trading workspace (v1.0.0)
+
+The chart includes selectable EMA/SMA/Bollinger overlays, RSI pane, historical pan/zoom, manual chart marks, a single editable position plan, and the initial SMC analysis pack. ICT, Alchemist and Order Flow packs are marked as in development. See [Chart Trading Workspace](docs/CHART_TRADING_WORKSPACE.md) for behavior and limitations. The workspace is analysis/planning only and does not place exchange orders.

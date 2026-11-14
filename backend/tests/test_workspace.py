@@ -42,5 +42,33 @@ def test_chart_analysis_panel_and_engine_are_served():
     assert "calculateAnalysis" in script
     assert "Bullish FVG" in script
     assert "Bearish CHoCH" in script
-    assert "analysis.fvgs" in script
+    assert "a.fvgs" in script
     assert ".analysis-grid" in styles
+
+
+def test_chart_workspace_has_single_trade_desk_and_strategy_packs():
+    client = TestClient(app)
+    page = client.get("/assets/index.html").text
+    script = client.get("/assets/app.js").text
+    styles = client.get("/assets/styles.css").text
+
+    assert 'id="tradeDeskActive"' in page
+    assert 'id="positionLongBtn"' in page
+    assert 'id="positionShortBtn"' in page
+    assert 'data-pack="smc"' in page
+    assert 'data-pack="ict"' in page
+    assert 'data-pack="alchemist"' in page
+    assert 'data-pack="orderflow"' in page
+    assert 'data-indicator="ema20"' in page
+    assert 'data-indicator="bb"' in page
+    assert 'data-draw="trendline"' in page
+    assert 'id="rsiChart"' in page
+    assert "nexora-active-position" in script
+    assert "function createPosition" in script
+    assert "function drawManualMark" in script
+    assert "function drawRsi" in script
+    assert "state.view.visible" in script
+    assert "orderBlocks" in script
+    assert "liquidity sweep" in script.lower()
+    assert ".trade-layout" in styles
+    assert ".indicator-toolbar" in styles

@@ -30,8 +30,18 @@
   <div class="panel-head"><div><div class="panel-kicker">LIVE PRICE ACTION</div><h2 id="chartTitle">BTCUSDT <span>·</span> 1H</h2></div>
    <div class="chart-controls"><div class="timeframes"><button data-interval="1m">1m</button><button data-interval="5m">5m</button><button data-interval="15m">15m</button><button class="selected" data-interval="1h">1h</button><button data-interval="4h">4h</button><button data-interval="1d">1D</button></div></div>
   </div>
+  <div class="chart-tool-row">
+   <div class="draw-tools">
+    <button data-draw="cursor" class="tool-active">↖ Cursor</button><button data-draw="horizontal">— Level</button><button data-draw="trendline">／ Trend</button><button data-draw="rectangle">▱ Zone</button><button data-draw="text">T Text</button>
+   </div>
+   <div class="chart-actions"><button id="positionLongBtn">＋ Long</button><button id="positionShortBtn">－ Short</button><button id="clearDrawingsBtn">Clear marks</button><button id="liveChartBtn" class="tool-active">LIVE</button></div>
+  </div>
+  <div class="indicator-toolbar">
+   <span>INDICATORS</span>
+   <label><input type="checkbox" data-indicator="ema20" checked> EMA 20</label><label><input type="checkbox" data-indicator="ema50" checked> EMA 50</label><label><input type="checkbox" data-indicator="sma200"> SMA 200</label><label><input type="checkbox" data-indicator="bb"> Bollinger</label><label><input type="checkbox" data-indicator="rsi" checked> RSI 14</label>
+  </div>
   <div class="price-line"><strong id="chartPrice">—</strong><span id="chartChange">LIVE · BINANCE</span></div>
-  <div class="chart-wrap"><canvas id="candleChart" aria-label="Live Binance candlestick chart"></canvas><div class="chart-loading" id="chartLoading"><div class="loader"></div><span>Loading historical candles</span></div></div>
+  <div class="chart-wrap"><canvas id="candleChart" aria-label="Live Binance candlestick chart"></canvas><canvas id="rsiChart" aria-label="RSI indicator chart" class="rsi-chart"></canvas><div class="chart-loading" id="chartLoading"><div class="loader"></div><span>Loading historical candles</span></div></div>
   <div class="chart-legend"><span><i class="up"></i> Bullish</span><span><i class="down"></i> Bearish</span><span class="chart-source">CUSTOM CANDLE ENGINE · BINANCE</span></div>
  </article>
  <article class="panel orderbook-panel">
@@ -41,6 +51,39 @@
   <div class="book-mid"><b id="bookMidPrice">—</b><span id="bookSpread">Spread —</span></div>
   <div class="book-side bids" id="bids"><div class="book-empty">Waiting for bid depth…</div></div>
   <div class="book-foot"><span><i class="ask-dot"></i> ASKS</span><span><i class="bid-dot"></i> BIDS</span><span id="bookUpdate">—</span></div>
+ </article>
+</section>
+</section>
+<section class="trade-layout">
+ <article class="panel trade-desk">
+  <div class="panel-head"><div><div class="panel-kicker">ONE ACTIVE IDEA · PAPER PLANNING</div><h2>Single Trade Desk</h2></div><span class="tag" id="tradeDeskStatus">NO ACTIVE SETUP</span></div>
+  <div id="tradeDeskEmpty" class="desk-empty">Choose Long or Short on the chart to create one position plan. Only one active setup is allowed across all symbols. Initial SL is a volatility-based draft; review and drag all levels before using it.</div>
+  <div id="tradeDeskActive" class="hidden">
+   <div class="desk-summary"><b id="deskDirection">LONG · BTCUSDT</b><span id="deskRiskReward">R:R 1:3</span></div>
+   <div class="desk-levels"><div><small>ENTRY</small><b id="deskEntry">—</b></div><div><small>STOP LOSS</small><b id="deskStop">—</b></div><div><small>TP 1</small><b id="deskTp1">—</b></div><div><small>TP 2</small><b id="deskTp2">—</b></div><div><small>TP 3</small><b id="deskTp3">—</b></div></div>
+   <div class="desk-confirmations" id="deskConfirmations"></div>
+   <button id="clearPositionBtn" class="secondary-btn">Close plan / Clear setup</button>
+  </div>
+ </article>
+ <article class="panel strategy-panel">
+  <div class="panel-head"><div><div class="panel-kicker">STRATEGY LIBRARY</div><h2>Analysis packs</h2></div><span class="tag">SELECT PACK</span></div>
+  <div class="pack-grid">
+   <button class="pack-card selected" data-pack="smc"><b>SMC PACK</b><span>ACTIVE · Core structure, liquidity & FVG</span></button>
+   <button class="pack-card developing" data-pack="ict"><b>ICT PACK</b><span>IN DEVELOPMENT</span></button>
+   <button class="pack-card developing" data-pack="alchemist"><b>ALCHEMIST PACK</b><span>IN DEVELOPMENT</span></button>
+   <button class="pack-card developing" data-pack="orderflow"><b>ORDER FLOW PACK</b><span>IN DEVELOPMENT</span></button>
+  </div>
+  <div class="confirmation-title">SMC CONFIRMATIONS</div>
+  <div class="confirmation-options">
+   <label><input type="checkbox" data-confirm="structure" checked> BOS / CHoCH</label>
+   <label><input type="checkbox" data-confirm="fvg" checked> FVG</label>
+   <label><input type="checkbox" data-confirm="ob" checked> Order Blocks</label>
+   <label><input type="checkbox" data-confirm="liquidity" checked> Liquidity Sweep</label>
+   <label><input type="checkbox" data-confirm="eq" checked> EQH / EQL</label>
+   <label><input type="checkbox" data-confirm="ema" checked> EMA confirmation</label>
+   <label><input type="checkbox" data-confirm="rsi" checked> RSI confirmation</label>
+   <label><input type="checkbox" data-confirm="volume"> Volume confirmation</label>
+  </div>
  </article>
 </section>
 <section class="analysis-panel panel" id="analysisPanel">
