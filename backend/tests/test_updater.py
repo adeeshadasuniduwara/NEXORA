@@ -5,6 +5,7 @@ import pytest
 
 from app.update_helper import safe_extract
 from app.update_service import _version_tuple
+from app.version import APP_VERSION
 
 
 def test_release_versions_are_compared_numerically():
@@ -36,3 +37,8 @@ def test_safe_extract_rejects_path_traversal(tmp_path: Path):
         bundle.writestr("backend/app/../../outside.txt", "bad")
     with pytest.raises(ValueError):
         safe_extract(archive, tmp_path)
+
+
+def test_release_version_file_matches_application_version():
+    repository_version = Path(__file__).resolve().parents[2] / "VERSION"
+    assert repository_version.read_text(encoding="utf-8").strip() == APP_VERSION
