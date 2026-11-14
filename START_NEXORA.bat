@@ -65,7 +65,7 @@ set "SERVER_EXIT=%ERRORLEVEL%"
 cd /d "%~dp0"
 
 rem A verified update creates this marker before stopping Uvicorn.
-if exist ".nexora_updates\\.pending" goto wait_for_update
+if exist ".nexora_updates\.pending" goto wait_for_update
 if not "%SERVER_EXIT%"=="0" (
   echo.
   echo [ERROR] NEXORA stopped unexpectedly.
@@ -90,7 +90,7 @@ goto wait_update_loop
 
 :update_dependencies
 echo [UPDATE] Checking dependencies for the new version...
-"%VPY%" -m pip install --disable-pip-version-check --retries 5 --timeout 30 -r "%~dp0backend\\requirements.txt"
+"%VPY%" -m pip install --disable-pip-version-check --retries 5 --timeout 30 -r "%~dp0backend\requirements.txt"
 if errorlevel 1 goto install_retry
 "%VPY%" -m pip check
 if errorlevel 1 goto install_retry
