@@ -1,10 +1,12 @@
 # Windows launcher and NEXORA workspace
 
-Run `START_NEXORA.bat` from the repository root. It checks for Python, creates an isolated backend virtual environment, repairs pip dependencies with retries, runs `pip check`, and starts the local FastAPI service and browser workspace.
+Run `START_NEXORA.bat` from the repository root. It checks for Python 3.10+, creates or repairs the isolated backend environment, installs requirements, and starts the local FastAPI service in the current Command Prompt window.
 
-## Automatic source updates
+## Automatic updates
 
-When the folder is a Git clone with a clean working tree, the launcher fetches and fast-forward pulls `origin/main` before startup. If local modifications exist, it skips updating rather than overwriting user work. A downloaded ZIP is not a Git clone and cannot self-update through Git; use a fresh clone or download a newer source archive.
+Updates are installed through the in-app GitHub Releases updater. A verified update uses a background Python helper to wait for the API process and replace application files. The helper does not launch another CMD window. The original launcher CMD waits for the helper, checks dependencies, and restarts Uvicorn in the same window. The existing browser tab reconnects automatically.
+
+For Git clones, updates require a clean working tree on `main`. For ZIP installs, only allowlisted application files are replaced; local databases and data folders are preserved.
 
 ## Recovery
 
