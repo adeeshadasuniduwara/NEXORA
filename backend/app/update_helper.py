@@ -114,7 +114,7 @@ def main() -> int:
     args = parser.parse_args()
     root, archive = Path(args.root).resolve(), Path(args.archive).resolve()
     manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
-    pending = root / ".nexora_update_pending"
+    pending = root / ".nexora_updates" / ".pending"
     failure = None
 
     try:
