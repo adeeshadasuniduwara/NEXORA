@@ -45,7 +45,7 @@ async function loadSymbols(){
  }catch(error){health("localHealth","API error",false);return []}
 }
 function selectSymbol(symbol){
- state.symbol=symbol;$("pairSearch").value=symbol;$("statSymbol").textContent=symbol;$("chartTitle").innerHTML=symbol+" <span>·</span> "+state.interval.toUpperCase();
+ state.symbol=symbol;try{localStorage.setItem("nexora-selected-symbol",symbol)}catch(error){}$("pairSearch").value=symbol;$("statSymbol").textContent=symbol;$("chartTitle").innerHTML=symbol+" <span>·</span> "+state.interval.toUpperCase();
  $("bookMidPrice").textContent="—";$("bookSpread").textContent="Spread —";$("asks").innerHTML='<div class="book-empty">Loading ask depth…</div>';$("bids").innerHTML='<div class="book-empty">Loading bid depth…</div>';
  state.book={bids:[],asks:[]};state.trades=[];renderPressure();loadCandles().then(startLive);
 }
@@ -144,7 +144,7 @@ async function startLive(){
  }catch(error){$("feedState").textContent="Unavailable";$("engineLabel").textContent="Could not start Binance stream";health("wsHealth","Unavailable",false)}
 }
 
-let updatePollBusy=false,updateInstallStarted=false;
+let updatePollBusy=false,updateInstallStarted=false,updateBlocked=false;
 function showUpdateToast(title,message,timeText=""){
  const toast=$("updateToast");if(!toast)return;
  $("updateToastTitle").textContent=title;$("updateToastMessage").textContent=message;$("updateToastTime").textContent=timeText;
@@ -163,7 +163,7 @@ async function watchForUpdatedServer(){
  showUpdateToast("Update restart is taking longer","NEXORA is still trying to restart. Please refresh the page in a moment.");
 }
 async function checkForNexoraUpdate(){
- if(updatePollBusy||updateInstallStarted)return;
+ if(updatePollBusy||updateInstallStarted||updateBlocked)return;
  updatePollBusy=true;
  try{
   const status=await api("/api/v1/system/update");
@@ -182,12 +182,12 @@ async function checkForNexoraUpdate(){
    showUpdateToast("New NEXORA update found","Version "+status.latest_version+" is downloading. The workspace will restart automatically.");
    const result=await api("/api/v1/system/update/apply",{method:"POST"});
    if(result.started)watchForUpdatedServer();
-   else{updateInstallStarted=false;showUpdateToast("Update not started",result.message||"The latest update could not be installed automatically.")}
+   else{updateInstallStarted=false;updateBlocked=true;showUpdateToast("Update not started",result.message||"The latest update could not be installed automatically.")}
   }
  }catch(error){
   const detail=String(error&&error.message||error);
   if(detail.includes("Local Git changes")||detail.includes("409")){
-   showUpdateToast("NEXORA update waiting","Local project changes were detected. They have been protected; close local edits before updating.");
+   updateBlocked=true;showUpdateToast("NEXORA update waiting","Local project changes were detected. They have been protected; close local edits before updating.");
   }else{
    showUpdateToast("Automatic update could not start",detail.slice(0,500));
   }
@@ -195,10 +195,11 @@ async function checkForNexoraUpdate(){
 }
 
 function init(){
+ try{state.symbol=localStorage.getItem("nexora-selected-symbol")||state.symbol;state.interval=localStorage.getItem("nexora-selected-interval")||state.interval;const active=document.querySelector('[data-interval="'+state.interval+'"]');if(active){document.querySelectorAll("[data-interval]").forEach(item=>item.classList.remove("selected"));active.classList.add("selected")}}catch(error){}
  $("searchPairBtn").addEventListener("click",searchPair);$("pairSearch").addEventListener("keydown",event=>{if(event.key==="Enter")searchPair()});
  $("pairSearch").addEventListener("input",()=>$("pairSearch").setCustomValidity(""));
  document.querySelectorAll("[data-interval]").forEach(button=>button.addEventListener("click",()=>{
-  document.querySelectorAll("[data-interval]").forEach(item=>item.classList.remove("selected"));button.classList.add("selected");state.interval=button.dataset.interval;
+  document.querySelectorAll("[data-interval]").forEach(item=>item.classList.remove("selected"));button.classList.add("selected");state.interval=button.dataset.interval;try{localStorage.setItem("nexora-selected-interval",state.interval)}catch(error){}
   $("chartTitle").innerHTML=state.symbol+" <span>·</span> "+state.interval.toUpperCase();loadCandles().then(startLive);
  }));
  $("refreshBtn").addEventListener("click",()=>{loadSymbols().then(()=>{loadCandles();startLive()})});
