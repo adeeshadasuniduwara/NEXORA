@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -24,7 +25,7 @@ _CACHE: dict[str, Any] = {"checked_at": 0.0, "payload": None}
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
-    numbers = re.findall(r"\\d+", value)
+    numbers = re.findall(r"\d+", value)
     return tuple(int(part) for part in numbers) or (0,)
 
 
@@ -93,7 +94,7 @@ def _download_verified_archive(release: dict[str, Any]) -> Path:
     if not release.get("downloadable"):
         raise RuntimeError("The latest GitHub Release does not contain the update archive and checksum.")
     root = _root_dir()
-    staging = root / ".nexora_updates"
+    staging = Path(tempfile.gettempdir()) / "nexora_updates" / "adeeshadasuniduwara_NEXORA"
     staging.mkdir(parents=True, exist_ok=True)
     headers = {"User-Agent": "NEXORA-Updater"}
     archive_response = httpx.get(release["archive_url"], headers=headers, timeout=90.0, follow_redirects=True)
