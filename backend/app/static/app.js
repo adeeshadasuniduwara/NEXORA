@@ -342,7 +342,73 @@ function refreshBookFreshness(){
  $("depthStatus").classList.toggle("live-tag",!stale);
 }
 
+
+function chartIndexAt(clientX){
+ const rect=$("candleChart").getBoundingClientRect(),x=clientX-rect.left,left=10,right=82,step=(rect.width-left-right)/state.view.visible;
+ return Math.max(0,Math.min(state.candles.length-1,(state.view.end||state.candles.length)-state.view.visible+Math.floor((x-left)/step)));
+}
+function updatePositionLevel(level,price){
+ const p=state.position;if(!p)return;
+ p[level]=price;
+ const risk=Math.abs(p.entry-p.stop),sign=p.direction==="LONG"?1:-1;
+ if(level==="entry"){p.tp1=price+sign*risk;p.tp2=price+sign*risk*2;p.tp3=price+sign*risk*3}
+ else if(level==="stop"){p.tp1=p.entry+sign*risk;p.tp2=p.entry+sign*risk*2;p.tp3=p.entry+sign*risk*3}
+ saveWorkspaceMarks();renderTradeDesk();drawChart();
+}
+function bindChartTools(){
+ const canvas=$("candleChart");let pointerStart=null;
+ document.querySelectorAll("[data-draw]").forEach(btn=>btn.addEventListener("click",()=>{
+  state.drawTool=btn.dataset.draw;document.querySelectorAll("[data-draw]").forEach(b=>b.classList.toggle("tool-active",b===btn));
+ }));
+ document.querySelectorAll("[data-indicator]").forEach(input=>input.addEventListener("change",()=>{state.indicators[input.dataset.indicator]=input.checked;drawChart()}));
+ document.querySelectorAll("[data-confirm]").forEach(input=>input.addEventListener("change",()=>{if(state.position)renderTradeDesk()}));
+ document.querySelectorAll("[data-pack]").forEach(btn=>btn.addEventListener("click",()=>{
+  if(btn.dataset.pack!=="smc")return;
+  document.querySelectorAll("[data-pack]").forEach(b=>b.classList.toggle("selected",b===btn));
+ }));
+ $("positionLongBtn").addEventListener("click",()=>{if(state.position){$("tradeDeskStatus").textContent="CLEAR CURRENT SETUP FIRST";return}state.drawTool="long";$("positionLongBtn").classList.add("tool-active");$("positionShortBtn").classList.remove("tool-active")});
+ $("positionShortBtn").addEventListener("click",()=>{if(state.position){$("tradeDeskStatus").textContent="CLEAR CURRENT SETUP FIRST";return}state.drawTool="short";$("positionShortBtn").classList.add("tool-active");$("positionLongBtn").classList.remove("tool-active")});
+ $("clearPositionBtn").addEventListener("click",()=>{state.position=null;saveWorkspaceMarks();renderTradeDesk();drawChart()});
+ $("clearDrawingsBtn").addEventListener("click",()=>{state.drawings=[];state.draft=null;saveWorkspaceMarks();drawChart()});
+ $("liveChartBtn").addEventListener("click",()=>{state.view.follow=true;state.view.end=state.candles.length;$("liveChartBtn").classList.add("tool-active");drawChart()});
+ canvas.addEventListener("pointerdown",event=>{
+  const rect=canvas.getBoundingClientRect(),px=event.clientX-rect.left,py=event.clientY-rect.top;
+  if(state.drawTool==="long"||state.drawTool==="short"){
+   if(!state.position){createPosition(state.drawTool==="long"?"LONG":"SHORT",priceAt(event.clientY));state.drawTool="cursor";$("positionLongBtn").classList.remove("tool-active");$("positionShortBtn").classList.remove("tool-active")}
+   return;
+  }
+  if(state.drawTool==="horizontal"){state.drawings.push({type:"horizontal",price:priceAt(event.clientY),label:"Manual level"});saveWorkspaceMarks();drawChart();return}
+  if(state.drawTool==="text"){const note=window.prompt("Chart note:");if(note){state.drawings.push({type:"text",index:chartIndexAt(event.clientX),price:priceAt(event.clientY),text:note.slice(0,80)});saveWorkspaceMarks();drawChart()}return}
+  if(state.drawTool==="trendline"||state.drawTool==="rectangle"){
+   const point={index:chartIndexAt(event.clientX),price:priceAt(event.clientY)};
+   if(!state.draft){state.draft={type:state.drawTool,p1:point,p2:point};}
+   else{state.draft.p2=point;state.drawings.push(state.draft);state.draft=null;saveWorkspaceMarks();drawChart()}
+   return;
+  }
+  if(state.position){
+   const levelNames=["entry","stop","tp1","tp2","tp3"],nearest=levelNames.map(name=>({name,dist:Math.abs(priceAt(event.clientY)-state.position[name])})).sort((a,b)=>a.dist-b.dist)[0];
+   const rectH=canvas.getBoundingClientRect().height,visible=state.candles.slice(Math.max(0,(state.view.end||state.candles.length)-state.view.visible),state.view.end||state.candles.length),range=Math.max(...visible.map(c=>+c.high))-Math.min(...visible.map(c=>+c.low))||1;
+   if(nearest&&nearest.dist<range*.025){state.dragging={level:nearest.name};canvas.setPointerCapture(event.pointerId);return}
+  }
+  state.dragging={pan:true,startX:event.clientX,startEnd:state.view.end||state.candles.length};pointerStart=event.clientX;canvas.setPointerCapture(event.pointerId);
+ });
+ canvas.addEventListener("pointermove",event=>{
+  if(!state.dragging)return;
+  if(state.dragging.level){updatePositionLevel(state.dragging.level,priceAt(event.clientY));return}
+  if(state.dragging.pan&&pointerStart!==null){
+   const rect=canvas.getBoundingClientRect(),step=(rect.width-92)/state.view.visible,delta=Math.round((pointerStart-event.clientX)/step);
+   state.view.end=Math.max(state.view.visible,Math.min(state.candles.length,state.dragging.startEnd+delta));state.view.follow=state.view.end>=state.candles.length;$("liveChartBtn").classList.toggle("tool-active",state.view.follow);drawChart();
+  }
+ });
+ const finish=()=>{if(state.dragging?.level)saveWorkspaceMarks();state.dragging=null;pointerStart=null};
+ canvas.addEventListener("pointerup",finish);canvas.addEventListener("pointercancel",finish);
+ canvas.addEventListener("wheel",event=>{
+  event.preventDefault();const old=state.view.visible,next=Math.max(30,Math.min(300,Math.round(old*(event.deltaY>0?1.15:.87))));
+  const anchor=chartIndexAt(event.clientX),ratio=(anchor-(state.view.end-old))/old;state.view.visible=next;state.view.end=Math.min(state.candles.length,Math.max(next,Math.round(anchor+next*(1-ratio))));state.view.follow=false;$("liveChartBtn").classList.remove("tool-active");drawChart();
+ },{passive:false});
+}
 function init(){
+ bindChartTools();loadWorkspaceMarks();
  try{state.symbol=localStorage.getItem("nexora-selected-symbol")||state.symbol;state.interval=localStorage.getItem("nexora-selected-interval")||state.interval;const active=document.querySelector('[data-interval="'+state.interval+'"]');if(active){document.querySelectorAll("[data-interval]").forEach(item=>item.classList.remove("selected"));active.classList.add("selected")}}catch(error){}
  $("searchPairBtn").addEventListener("click",searchPair);$("pairSearch").addEventListener("keydown",event=>{if(event.key==="Enter")searchPair()});
  $("pairSearch").addEventListener("input",()=>$("pairSearch").setCustomValidity(""));
