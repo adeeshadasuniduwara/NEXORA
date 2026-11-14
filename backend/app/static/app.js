@@ -161,7 +161,7 @@ function drawManualMark(ctx,d,x,y,pad,width,height){
  if(d.type==="text"){ctx.font="11px Manrope";ctx.fillText(d.text||"Note",x(d.index),y(d.price))}
  ctx.restore();
 }
-function priceAt(clientY){const rect=$("candleChart").getBoundingClientRect(),data=state.candles.slice(Math.max(0,(state.view.end||state.candles.length)-state.view.visible),state.view.end||state.candles.length);if(!data.length)return 0;const top=12,chartH=rect.height-(state.indicators.rsi?88:0)-34,lo=Math.min(...data.map(c=>+c.low)),hi=Math.max(...data.map(c=>+c.high)),range=hi-lo||1;return hi-(clientY-rect.top-top)/chartH*range}
+function priceAt(clientY){const rect=$("candleChart").getBoundingClientRect(),end=state.view.end||state.candles.length,begin=Math.max(0,end-state.view.visible),data=state.candles.slice(begin,end);if(!data.length)return 0;let lo=Math.min(...data.map(c=>+c.low)),hi=Math.max(...data.map(c=>+c.high));if(state.position&&state.position.symbol===state.symbol)[state.position.entry,state.position.stop,state.position.tp1,state.position.tp2,state.position.tp3].forEach(v=>{lo=Math.min(lo,+v);hi=Math.max(hi,+v)});state.drawings.forEach(d=>[d.price,d.p1?.price,d.p2?.price].filter(Number.isFinite).forEach(v=>{lo=Math.min(lo,v);hi=Math.max(hi,v)}));const range=(hi-lo)||1;lo-=range*.06;hi+=range*.06;const top=12,chartH=rect.height-(state.indicators.rsi?88:0)-34;return hi-(clientY-rect.top-top)/chartH*(hi-lo)}
 function createPosition(direction,price){
  const recent=state.candles.slice(-15),tr=recent.slice(1).map((c,i)=>Math.max(+c.high- +c.low,Math.abs(+c.high- +recent[i].close),Math.abs(+c.low- +recent[i].close))),atr=tr.length?tr.reduce((a,b)=>a+b,0)/tr.length:price*.01,risk=Math.max(atr*1.5,price*.001),stop=direction==="LONG"?price-risk:price+risk,unit=Math.abs(price-stop);
  state.position={direction,symbol:state.symbol,entry:price,stop,tp1:price+(direction==="LONG"?1:-1)*unit,tp2:price+(direction==="LONG"?2:-2)*unit,tp3:price+(direction==="LONG"?3:-3)*unit,createdAt:Date.now()};
@@ -185,7 +185,7 @@ async function loadOlderHistory(){
   if(!older.length){state.historyExhausted=true;return}
   const oldEnd=state.view.end||state.candles.length;
   state.candles=older.concat(state.candles).slice(-5000);
-  const added=older.length;state.view.end=Math.min(state.candles.length,oldEnd+added);calculateAnalysis();drawChart();
+  const added=older.length;state.drawings.forEach(d=>{if(d.index!==undefined)d.index+=added;if(d.p1)d.p1.index+=added;if(d.p2)d.p2.index+=added});if(state.dragging?.startEnd)state.dragging.startEnd+=added;state.view.end=Math.min(state.candles.length,oldEnd+added);calculateAnalysis();drawChart();
  }catch(error){$("chartChange").textContent="HISTORY LOAD FAILED · "+String(error.message||error).slice(0,80)}
  finally{state.historyLoading=false}
 }
