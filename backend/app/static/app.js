@@ -188,6 +188,8 @@ async function checkForNexoraUpdate(){
   const detail=String(error&&error.message||error);
   if(detail.includes("Local Git changes")||detail.includes("409")){
    showUpdateToast("NEXORA update waiting","Local project changes were detected. They have been protected; close local edits before updating.");
+  }else{
+   showUpdateToast("Automatic update could not start",detail.slice(0,500));
   }
  }finally{updatePollBusy=false}
 }
@@ -201,7 +203,7 @@ function init(){
  }));
  $("refreshBtn").addEventListener("click",()=>{loadSymbols().then(()=>{loadCandles();startLive()})});
  $("updateToastClose")?.addEventListener("click",()=>$("updateToast").classList.add("hidden"));
- checkForNexoraUpdate();setInterval(checkForNexoraUpdate,60000);
+ checkForNexoraUpdate();setInterval(checkForNexoraUpdate,30000);
  window.addEventListener("resize",()=>{clearTimeout(state.resizeTimer);state.resizeTimer=setTimeout(drawChart,100)});
  api("/health").then(()=>{health("localHealth","Online",true);$("engineLabel").textContent="Local engine online"}).catch(()=>health("localHealth","Offline",false));
  loadSymbols().then(()=>{if(!state.symbols.length)return;$("pairSearch").value=state.symbol;selectSymbol(state.symbol)});
