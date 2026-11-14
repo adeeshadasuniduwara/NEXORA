@@ -33,7 +33,7 @@ def safe_extract(archive: Path, root: Path) -> None:
     staging.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archive) as bundle:
         for info in bundle.infolist():
-            name = info.filename.replace("\\\\", "/")
+            name = info.filename.replace("\\", "/")
             path = PurePosixPath(name)
             if path.is_absolute() or ".." in path.parts:
                 raise ValueError(f"Unsafe archive path: {name}")
