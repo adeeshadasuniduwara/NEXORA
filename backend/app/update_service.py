@@ -155,7 +155,8 @@ def begin_update() -> dict[str, Any]:
         sys.executable, str(helper), "--root", str(root), "--archive", str(archive_path),
         "--manifest", str(manifest_path), "--parent-pid", str(os.getpid()),
     ]
-    pending = root / ".nexora_update_pending"
+    pending = root / ".nexora_updates" / ".pending"
+    pending.parent.mkdir(parents=True, exist_ok=True)
     if pending.exists():
         return {"started": False, "reason": "update_in_progress", "message": "An update is already being installed."}
     pending.write_text(str(os.getpid()), encoding="ascii")
