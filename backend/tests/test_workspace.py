@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.routes.system import router as system_router
 
 
 def test_workspace_home_redirects_to_local_ui():
@@ -25,6 +26,6 @@ def test_workspace_assets_are_served():
 
 
 def test_system_update_endpoints_are_registered():
-    paths = {route.path for route in app.routes}
-    assert "/api/v1/system/update" in paths
-    assert "/api/v1/system/update/apply" in paths
+    paths = {route.path for route in system_router.routes}
+    assert "/system/update" in paths
+    assert "/system/update/apply" in paths
