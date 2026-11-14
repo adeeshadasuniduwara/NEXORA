@@ -155,14 +155,23 @@ def begin_update() -> dict[str, Any]:
         sys.executable, str(helper), "--root", str(root), "--archive", str(archive_path),
         "--manifest", str(manifest_path), "--parent-pid", str(os.getpid()),
     ]
+    pending = root / ".nexora_update_pending"
+    if pending.exists():
+        return {"started": False, "reason": "update_in_progress", "message": "An update is already being installed."}
+    pending.write_text(str(os.getpid()), encoding="ascii")
     creation_flags = 0
     if os.name == "nt":
         creation_flags = getattr(subprocess, "DETACHED_PROCESS", 0x00000008) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
-    subprocess.Popen(
-        command, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL, close_fds=True, creationflags=creation_flags,
-    )
+    try:
+        subprocess.Popen(
+            command, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, close_fds=True, creationflags=creation_flags,
+        )
+    except Exception:
+        pending.unlink(missing_ok=True)
+        raise
     # Let FastAPI return the HTTP response before asking Uvicorn to shut down.
+    # The original launcher CMD sees the pending marker and restarts the server.
     server_pid = os.getpid()
     def request_shutdown() -> None:
         try:
@@ -172,4 +181,4 @@ def begin_update() -> dict[str, Any]:
     timer = threading.Timer(2.0, request_shutdown)
     timer.daemon = True
     timer.start()
-    return {"started": True, "status": "installing", "version": release["latest_version"], "message": "Update verified and installation is starting."}
+    return {"started": True, "status": "installing", "version": release["latest_version"], "message": "Update verified; the existing launcher window will restart NEXORA."}
