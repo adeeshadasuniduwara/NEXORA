@@ -23,7 +23,7 @@ function ema(values,period){
 }
 function calculateAnalysis(){
  const candles=state.candles,n=candles.length;
- if(n<55){state.analysis=null;renderAnalysis();return}
+ if(n<55){state.analysis=null;renderAnalysis();if(state.position)renderTradeDesk();return}
  const highs=candles.map(c=>Number(c.high)),lows=candles.map(c=>Number(c.low)),closes=candles.map(c=>Number(c.close));
  const ema20=ema(closes,20),ema50=ema(closes,50),last=closes.at(-1);
  let gains=0,losses=0;
@@ -72,7 +72,7 @@ function calculateAnalysis(){
  if(breakEvent)score+=breakEvent.bearish?-1:1;
  const bias=score>=2?"BULLISH":score<=-2?"BEARISH":"NEUTRAL";
  state.analysis={ema20,ema50,rsi,structure,structureDetail,events,fvgs:fvgs,orderBlocks,sweeps,liquidity:{equalHigh,equalLow},bias,score,last};
- renderAnalysis();
+ renderAnalysis();if(state.position)renderTradeDesk();
 }
 function renderAnalysis(){
  const a=state.analysis;
@@ -170,8 +170,8 @@ function renderTradeDesk(){
  const p=state.position,active=!!p;$("tradeDeskEmpty").classList.toggle("hidden",active);$("tradeDeskActive").classList.toggle("hidden",!active);$("tradeDeskStatus").textContent=active?"ONE ACTIVE SETUP":"NO ACTIVE SETUP";
  if(!p)return;$("deskDirection").textContent=p.direction+" · "+p.symbol;$("deskRiskReward").textContent="R:R 1:3";
  $("deskEntry").textContent=fmt(p.entry);$("deskStop").textContent=fmt(p.stop);$("deskTp1").textContent=fmt(p.tp1);$("deskTp2").textContent=fmt(p.tp2);$("deskTp3").textContent=fmt(p.tp3);
- const a=state.analysis,host=$("deskConfirmations");host.replaceChildren();const recentVol=state.candles.slice(-20).map(c=>Number(c.volume||0)),volAvg=recentVol.length?recentVol.reduce((x,y)=>x+y,0)/recentVol.length:0,volOk=recentVol.length>1&&recentVol.at(-1)>volAvg;const checks=[["EMA",a&&((p.direction==="LONG"&&a.ema20>a.ema50)||(p.direction==="SHORT"&&a.ema20<a.ema50))],["RSI",a&&(p.direction==="LONG"?a.rsi>50:a.rsi<50)],["Structure",a&&(p.direction==="LONG"?a.structure==="BULLISH STRUCTURE":a.structure==="BEARISH STRUCTURE")],["FVG",a&&a.fvgs.some(z=>!z.bearish=== (p.direction==="LONG"))],["Volume",volOk]];
- checks.forEach(([name,ok])=>{const el=document.createElement("span");el.className=ok?"confirm-ok":"confirm-pending";el.textContent=(ok?"✓ ":"○ ")+name;host.appendChild(el)});
+ const a=state.analysis,host=$("deskConfirmations");host.replaceChildren();const recentVol=state.candles.slice(-20).map(c=>Number(c.volume||0)),volAvg=recentVol.length?recentVol.reduce((x,y)=>x+y,0)/recentVol.length:0,volOk=recentVol.length>1&&recentVol.at(-1)>volAvg;const checks=[["EMA","ema",a&&((p.direction==="LONG"&&a.ema20>a.ema50)||(p.direction==="SHORT"&&a.ema20<a.ema50))],["RSI","rsi",a&&(p.direction==="LONG"?a.rsi>50:a.rsi<50)],["Structure","structure",a&&(p.direction==="LONG"?a.structure==="BULLISH STRUCTURE":a.structure==="BEARISH STRUCTURE")],["FVG","fvg",a&&a.fvgs.some(z=>!z.bearish=== (p.direction==="LONG"))],["Volume","volume",volOk]];
+ checks.filter(([,key])=>state.confirmations[key]).forEach(([name,key,ok])=>{const el=document.createElement("span");el.className=ok?"confirm-ok":"confirm-pending";el.textContent=(ok?"✓ ":"○ ")+name;host.appendChild(el)});
 }
 
 function updateCandle(k){
