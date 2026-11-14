@@ -128,9 +128,9 @@ function drawRsi(values){
 }
 function drawChart(){
  const m=chartMetrics(),{ctx,width,height,data,begin,end,pad,chartH,chartW}=m;if(!data.length)return;
- ctx.clearRect(0,0,width,height);const highs=data.map(c=>+c.high),lows=data.map(c=>+c.low),closes=data.map(c=>+c.close);
- const ema20=indicatorSeries(closes,20),ema50=indicatorSeries(closes,50),sma200=indicatorSeries(closes,200),mid=indicatorSeries(closes,20,"sma");
- const sd=closes.map((_,i)=>i<19?null:Math.sqrt(closes.slice(i-19,i+1).reduce((sum,v)=>sum+(v-mid[i])**2,0)/20));
+ ctx.clearRect(0,0,width,height);const highs=data.map(c=>+c.high),lows=data.map(c=>+c.low),allCloses=state.candles.map(c=>+c.close),closes=allCloses.slice(begin,end);
+ const ema20=indicatorSeries(allCloses,20).slice(begin,end),ema50=indicatorSeries(allCloses,50).slice(begin,end),sma200=indicatorSeries(allCloses,200).slice(begin,end),mid=indicatorSeries(allCloses,20,"sma").slice(begin,end);
+ const allMid=indicatorSeries(allCloses,20,"sma"),allSd=allCloses.map((_,i)=>i<19?null:Math.sqrt(allCloses.slice(i-19,i+1).reduce((sum,v)=>sum+(v-allMid[i])**2,0)/20)),sd=allSd.slice(begin,end);
  let low=Math.min(...lows),high=Math.max(...highs);const position=state.position;
  if(position){[position.entry,position.stop,position.tp1,position.tp2,position.tp3].forEach(v=>{if(Number.isFinite(+v)){low=Math.min(low,+v);high=Math.max(high,+v)}})}
  if(state.drawings.length){state.drawings.forEach(d=>{if(d.price){low=Math.min(low,d.price);high=Math.max(high,d.price)}if(d.p1?.price){low=Math.min(low,d.p1.price);high=Math.max(high,d.p1.price)}if(d.p2?.price){low=Math.min(low,d.p2.price);high=Math.max(high,d.p2.price)}})}
@@ -146,7 +146,7 @@ function drawChart(){
  state.drawings.forEach(d=>drawManualMark(ctx,d,x,y,pad,width,height));
  if(position&&position.symbol===state.symbol)drawPosition(ctx,position,y,pad,width);
  const last=data.at(-1),lastY=y(+last.close);ctx.setLineDash([4,4]);ctx.strokeStyle="#70e5bd88";ctx.beginPath();ctx.moveTo(pad.left,lastY);ctx.lineTo(width-pad.right,lastY);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#173d36";ctx.fillRect(width-pad.right+4,lastY-9,74,18);ctx.fillStyle="#a2f4d9";ctx.textAlign="center";ctx.fillText(fmt(last.close),width-pad.right+41,lastY+3);
- const rsiValues=closes;drawRsi(rsiValues);
+ drawRsi(allCloses);
 }
 function drawPosition(ctx,p,y,pad,width){
  const levels=[["ENTRY",p.entry,"#e9c46a"],["SL",p.stop,"#f17e8c"],["TP1",p.tp1,"#70e5bd"],["TP2",p.tp2,"#70e5bd"],["TP3",p.tp3,"#70e5bd"]];
