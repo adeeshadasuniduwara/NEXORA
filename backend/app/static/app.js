@@ -171,7 +171,7 @@ function renderTradeDesk(){
  const p=state.position,active=!!p;$("tradeDeskEmpty").classList.toggle("hidden",active);$("tradeDeskActive").classList.toggle("hidden",!active);$("tradeDeskStatus").textContent=active?"ONE ACTIVE SETUP":"NO ACTIVE SETUP";
  if(!p)return;$("deskDirection").textContent=p.direction+" · "+p.symbol;$("deskRiskReward").textContent="R:R 1:3";
  $("deskEntry").textContent=fmt(p.entry);$("deskStop").textContent=fmt(p.stop);$("deskTp1").textContent=fmt(p.tp1);$("deskTp2").textContent=fmt(p.tp2);$("deskTp3").textContent=fmt(p.tp3);
- const a=state.analysis,host=$("deskConfirmations");host.replaceChildren();const recentVol=state.candles.slice(-20).map(c=>Number(c.volume||0)),volAvg=recentVol.length?recentVol.reduce((x,y)=>x+y,0)/recentVol.length:0,volOk=recentVol.length>1&&recentVol.at(-1)>volAvg;const checks=[["EMA","ema",a&&((p.direction==="LONG"&&a.ema20>a.ema50)||(p.direction==="SHORT"&&a.ema20<a.ema50))],["RSI","rsi",a&&(p.direction==="LONG"?a.rsi>50:a.rsi<50)],["Structure","structure",a&&(p.direction==="LONG"?a.structure==="BULLISH STRUCTURE":a.structure==="BEARISH STRUCTURE")],["FVG","fvg",a&&a.fvgs.some(z=>!z.bearish=== (p.direction==="LONG"))],["Volume","volume",volOk]];
+ const a=state.analysis,host=$("deskConfirmations");host.replaceChildren();const recentVol=state.candles.slice(-20).map(c=>Number(c.volume||0)),volAvg=recentVol.length?recentVol.reduce((x,y)=>x+y,0)/recentVol.length:0,volOk=recentVol.length>1&&recentVol.at(-1)>volAvg;const checks=[["EMA","ema",a&&((p.direction==="LONG"&&a.ema20>a.ema50)||(p.direction==="SHORT"&&a.ema20<a.ema50))],["RSI","rsi",a&&(p.direction==="LONG"?a.rsi>50:a.rsi<50)],["Structure","structure",a&&(p.direction==="LONG"?a.structure==="BULLISH STRUCTURE":a.structure==="BEARISH STRUCTURE")],["FVG","fvg",a&&a.fvgs.some(z=>!z.bearish=== (p.direction==="LONG"))],["Volume","volume",volOk],["Liquidity sweep","liquidity",a&&a.sweeps.some(z=>z.bearish===(p.direction==="SHORT"))],["Order block","ob",a&&a.orderBlocks.some(z=>z.bearish===(p.direction==="SHORT"))],["EQH / EQL","eq",a&&!!(p.direction==="LONG"?a.liquidity.equalLow:a.liquidity.equalHigh)]];
  checks.filter(([,key])=>state.confirmations[key]).forEach(([name,key,ok])=>{const el=document.createElement("span");el.className=ok?"confirm-ok":"confirm-pending";el.textContent=(ok?"✓ ":"○ ")+name;host.appendChild(el)});
 }
 
@@ -185,7 +185,7 @@ async function loadOlderHistory(){
   if(!older.length){state.historyExhausted=true;return}
   const oldEnd=state.view.end||state.candles.length;
   state.candles=older.concat(state.candles).slice(-5000);
-  const added=older.length;state.drawings.forEach(d=>{if(d.index!==undefined)d.index+=added;if(d.p1)d.p1.index+=added;if(d.p2)d.p2.index+=added});if(state.dragging?.startEnd)state.dragging.startEnd+=added;state.view.end=Math.min(state.candles.length,oldEnd+added);calculateAnalysis();drawChart();
+  const added=older.length;state.drawings.forEach(d=>{if(d.index!==undefined)d.index+=added;if(d.p1)d.p1.index+=added;if(d.p2)d.p2.index+=added});if(state.dragging?.startEnd)state.dragging.startEnd+=added;saveWorkspaceMarks();state.view.end=Math.min(state.candles.length,oldEnd+added);calculateAnalysis();drawChart();
  }catch(error){$("chartChange").textContent="HISTORY LOAD FAILED · "+String(error.message||error).slice(0,80)}
  finally{state.historyLoading=false}
 }
@@ -429,7 +429,7 @@ function bindChartTools(){
  },{passive:false});
 }
 function init(){
- bindChartTools();loadWorkspaceMarks();
+ bindChartTools();loadWorkspaceMarks();window.addEventListener("storage",event=>{if(event.key==="nexora-active-position"){try{state.position=JSON.parse(event.newValue||"null")}catch(error){state.position=null}renderTradeDesk();drawChart()}});
  try{state.symbol=localStorage.getItem("nexora-selected-symbol")||state.symbol;state.interval=localStorage.getItem("nexora-selected-interval")||state.interval;const active=document.querySelector('[data-interval="'+state.interval+'"]');if(active){document.querySelectorAll("[data-interval]").forEach(item=>item.classList.remove("selected"));active.classList.add("selected")}}catch(error){}
  $("searchPairBtn").addEventListener("click",searchPair);$("pairSearch").addEventListener("keydown",event=>{if(event.key==="Enter")searchPair()});
  $("pairSearch").addEventListener("input",()=>$("pairSearch").setCustomValidity(""));
