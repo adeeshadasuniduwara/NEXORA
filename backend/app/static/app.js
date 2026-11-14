@@ -57,7 +57,7 @@ function searchPair(){
  $("pairSearch").setCustomValidity("");selectSymbol(match.symbol);
 }
 function renderMovers(){
- const rows=[...state.tickerMap.values()].filter(t=>state.symbolSet.has(t.s)).map(t=>{const history=state.priceHistory.get(t.s)||[],oldest=history[0],fastMove=oldest&&oldest.price?((Number(t.c)/oldest.price)-1)*100:Number(t.P||0);return {...t,fastMove}}).sort((a,b)=>Math.abs(b.fastMove)-Math.abs(a.fastMove)).slice(0,12);
+ const rows=[...state.tickerMap.values()].filter(t=>state.symbolSet.has(t.s)).map(t=>{const history=state.priceHistory.get(t.s)||[],oldest=history[0],fastMove=oldest&&oldest.price&&Date.now()-oldest.time>=60000?((Number(t.c)/oldest.price)-1)*100:Number(t.P||0);return {...t,fastMove}}).sort((a,b)=>Math.abs(b.fastMove)-Math.abs(a.fastMove)).slice(0,12);
  const host=$("moversList");host.replaceChildren();
  if(!rows.length){host.innerHTML='<div class="book-empty">Waiting for live ticker data…</div>';return}
  const fragment=document.createDocumentFragment();
@@ -72,7 +72,7 @@ function renderMovers(){
  host.appendChild(fragment);
 }
 function updateTicker(t){
- if(!t||!t.s)return;state.tickerMap.set(t.s,t);const now=Date.now(),history=state.priceHistory.get(t.s)||[];if(!history.length||history.at(-1).price!==Number(t.c))history.push({time:now,price:Number(t.c)});while(history.length&&now-history[0].time>60000)history.shift();state.priceHistory.set(t.s,history);
+ if(!t||!t.s)return;state.tickerMap.set(t.s,t);const now=Date.now(),history=state.priceHistory.get(t.s)||[];if(!history.length||history.at(-1).price!==Number(t.c))history.push({time:now,price:Number(t.c)});while(history.length&&now-history[0].time>65000)history.shift();state.priceHistory.set(t.s,history);
  if(t.s===state.symbol){
   setPrice(t.c);const change=Number(t.P||0);$("statChange").textContent=(change>0?"+":"")+change.toFixed(2)+"%";$("statChange").className="stat-value "+(change>=0?"positive":"negative");
   $("statVolume").textContent="24h quote volume "+compact(t.q);$("chartChange").textContent=(change>0?"+":"")+change.toFixed(2)+"% · 24H";
