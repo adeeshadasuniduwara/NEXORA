@@ -114,6 +114,7 @@ class BinanceStreamClient:
                             elif isinstance(payload, dict):
                                 if stream and "@depth20@" in stream:
                                     payload["_stream"] = stream
+                                    payload["s"] = stream.split("@", 1)[0].upper()
                                 await self.on_event(payload)
                             self.last_event_at = asyncio.get_running_loop().time()
                         except (json.JSONDecodeError, TypeError, ValueError) as exc:
