@@ -2,7 +2,7 @@
 
 ## Pair discovery
 
-The market symbol endpoint uses Binance Spot `exchangeInfo` and returns every symbol marked `TRADING` with Spot trading enabled. The browser builds its pair search list from that response; it does not hard-code a short watchlist.
+The market symbol endpoint uses Binance Spot `exchangeInfo` and returns every symbol marked `TRADING` with Spot trading enabled. The browser builds its pair search list from that response on startup and refreshes the discovery list every five minutes, so newly listed Spot pairs are added automatically without a manual reload.
 
 ## Live data design
 
