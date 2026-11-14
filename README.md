@@ -1,37 +1,39 @@
 # NEXORA
 
-A chart-first crypto market analysis platform powered by Binance public market data.
+A chart-first crypto market analysis workspace powered by Binance public market data.
 
-## Current status
+## Current capabilities
 
-Phase 01 foundation is being built. The initial backend provides a small FastAPI service and a Binance Spot market-data adapter. Trading, order placement, and withdrawals are intentionally out of scope for the initial paper/analysis release.
+- Binance Spot symbol discovery and historical candle retrieval.
+- SQLite-backed historical candle storage and bounded backfill.
+- Binance Spot WebSocket streams for candles, trades, and book ticker events.
+- Local animated browser workspace with a project-owned candlestick renderer.
+- Windows one-click launcher with environment setup, dependency repair, and Git-based updates.
 
 ## Architecture
 
-- `backend/` — Python FastAPI API and market-data adapters.
-- `frontend/` — browser client (React + TypeScript, planned).
-- `docs/` — architecture and implementation notes.
+- `backend/` — FastAPI API, Binance REST/WebSocket adapters, and browser UI assets.
+- `docs/` — architecture and operational notes.
+- `START_NEXORA.bat` — Windows launcher.
 
-## Binance candle data
+## Windows quick start
 
-NEXORA uses Binance public market-data endpoints directly. Historical candles are retrieved from the Spot REST klines endpoint in pages; live candle updates will use Binance WebSocket kline streams in a later phase. Candle history is limited by the symbol's actual listing/trading history and Binance availability; it is not unlimited for every symbol.
+1. Install Python 3.10+ and Git for Windows.
+2. Clone or download this repository.
+3. Double-click `START_NEXORA.bat`.
+4. The launcher prepares the isolated environment and opens the local workspace at `http://127.0.0.1:8000`.
 
-## Run backend locally
+For a Git clone with a clean working tree, each launch checks `origin/main` and fast-forward updates before startup. If local changes are present, updating is skipped to protect them. ZIP downloads do not contain Git history and cannot self-update through Git.
 
-```bash
-cd backend
-python -m venv .venv
-# Windows: .venv\\Scripts\\activate
-# macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+See [Windows launcher guide](docs/WINDOWS_LAUNCHER.md).
 
-Open `http://127.0.0.1:8000/docs` for the API documentation.
+## Data limits
+
+Historical candle availability depends on each symbol's listing history and Binance availability. NEXORA does not promise unlimited historical data. WebSocket reconnect is supported; automatic REST gap backfill after a disconnect remains a follow-up reliability task.
 
 ## Safety
 
-- Public market data only in the foundation phase.
-- No exchange trading permissions or withdrawal features.
+- Public market data only; no live order placement or withdrawals.
+- No exchange trading credentials are required.
 - Never commit API keys, Telegram bot tokens, or `.env` files.
-- OpenAI integration will be optional to market-data processing and called only for selected higher-level reasoning tasks; API usage may incur provider charges.
+- OpenAI integration, if enabled in a later release, may incur provider charges.
