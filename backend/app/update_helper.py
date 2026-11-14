@@ -12,7 +12,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
-ALLOWED_PREFIXES = ("backend/app/", "backend/requirements.txt", "START_NEXORA.bat", "docs/")
+ALLOWED_PREFIXES = ("backend/app/", "backend/requirements.txt", "START_NEXORA.bat", "VERSION", "docs/")
 
 
 def wait_for_process(pid: int, timeout: int = 120) -> None:
