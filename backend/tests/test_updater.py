@@ -55,7 +55,7 @@ def test_update_helper_leaves_restart_to_the_existing_launcher():
     assert 'pending = root / ".nexora_updates" / ".pending"' in helper
     assert 'pending = root / ".nexora_updates" / ".pending"' in service
     assert 'if exist ".nexora_updates\\.pending" goto wait_for_update' in launcher
-    assert 'if not exist ".nexora_updates\\.pending" goto run_server' in launcher
+    assert 'if not exist ".nexora_updates\\.pending" goto update_dependencies' in launcher
     assert "goto run_server" in launcher
 
 
