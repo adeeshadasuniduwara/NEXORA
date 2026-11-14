@@ -43,6 +43,21 @@
   <div class="book-foot"><span><i class="ask-dot"></i> ASKS</span><span><i class="bid-dot"></i> BIDS</span><span id="bookUpdate">—</span></div>
  </article>
 </section>
+<section class="analysis-panel panel" id="analysisPanel">
+ <div class="panel-head"><div><div class="panel-kicker">DETERMINISTIC MARKET INTELLIGENCE</div><h2>Chart analysis</h2></div><span class="tag" id="analysisState">CALCULATING</span></div>
+ <div class="analysis-topline"><div><small>MARKET BIAS</small><strong id="analysisBias">—</strong><span id="analysisReason">Waiting for candle data</span></div><div class="analysis-score"><small>TECHNICAL SCORE</small><b id="analysisScore">—</b><span id="analysisScoreLabel">Not enough data</span></div></div>
+ <div class="analysis-grid">
+  <article class="analysis-card"><small>MARKET STRUCTURE</small><b id="analysisStructure">—</b><span id="analysisStructureDetail">—</span></article>
+  <article class="analysis-card"><small>EMA 20 / 50</small><b id="analysisEma">—</b><span id="analysisEmaDetail">—</span></article>
+  <article class="analysis-card"><small>RSI · 14</small><b id="analysisRsi">—</b><span id="analysisRsiDetail">—</span></article>
+  <article class="analysis-card"><small>LIQUIDITY LEVELS</small><b id="analysisLiquidity">—</b><span id="analysisLiquidityDetail">—</span></article>
+ </div>
+ <div class="analysis-lower">
+  <div><div class="analysis-subhead">LATEST STRUCTURE EVENTS</div><div id="structureEvents" class="analysis-list"><span>Waiting for confirmed swings…</span></div></div>
+  <div><div class="analysis-subhead">FAIR VALUE GAPS</div><div id="fvgEvents" class="analysis-list"><span>Scanning candle imbalances…</span></div></div>
+ </div>
+ <p class="analysis-disclaimer">Educational market analysis only. Conditions are calculated from available Binance Spot candles; this is not a guaranteed prediction or trade instruction.</p>
+</section>
 <section class="bottom-grid">
  <article class="panel movers-panel"><div class="panel-head"><div><div class="panel-kicker">LIVE MARKET SCANNER</div><h2>Fast-moving pairs</h2></div><span class="tag">ALL SPOT PAIRS</span></div><div class="movers-table"><div class="movers-head"><span>PAIR</span><span>LAST PRICE</span><span>24H CHANGE</span><span>QUOTE VOLUME</span></div><div id="moversList"><div class="book-empty">Waiting for live ticker data…</div></div></div><p class="muted">Ranked by absolute 24-hour percentage move from Binance's all-market ticker stream. Select any pair to open its live chart and order book.</p></article>
  <article class="panel flow-panel"><div class="panel-head"><div><div class="panel-kicker">REAL-TIME EXECUTIONS</div><h2>Trade pressure</h2></div><span class="tag">LIVE TRADES</span></div><div class="flow-summary"><div><small>BUY VOLUME</small><b id="buyPressure">—</b></div><div><small>SELL VOLUME</small><b id="sellPressure">—</b></div></div><div class="pressure-track"><i id="pressureBar"></i></div><div class="flow-foot"><span id="tradeCount">0 trades received</span><span id="pressureRatio">—</span></div><div class="health-list"><div><span>REST history</span><b id="restHealth">Checking</b></div><div><span>WebSocket</span><b id="wsHealth">Checking</b></div><div><span>Local engine</span><b id="localHealth">Checking</b></div></div></article>
