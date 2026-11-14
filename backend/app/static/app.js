@@ -1,5 +1,5 @@
 const API="/api/v1";
-const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],analysis:null,view:{end:0,visible:120,follow:true},historyLoading:false,historyExhausted:false,indicators:{ema20:true,ema50:true,sma200:false,bb:false,rsi:true},confirmations:{structure:true,fvg:true,ob:true,liquidity:true,eq:true,ema:true,rsi:true,volume:false},drawTool:"cursor",drawings:[],draft:null,position:null,dragging:null,socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]}};
+const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],analysis:null,view:{end:0,visible:120,follow:true},historyLoading:false,historyExhausted:false,indicators:{ema20:true,ema50:true,sma200:false,bb:false,rsi:true},confirmations:{structure:true,fvg:true,ob:true,liquidity:true,eq:true,ema:true,rsi:true,volume:false},drawTool:"cursor",drawings:[],draft:null,position:null,dragging:null,socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]},paintQueued:false,analysisQueued:false,lastAnalysisAt:0,searchMatches:[]};
 const $=id=>document.getElementById(id);
 const fmt=(v,max=8)=>Number(v||0).toLocaleString("en-US",{maximumFractionDigits:max});
 const compact=v=>{const n=Number(v||0);return n>=1e9?(n/1e9).toFixed(2)+"B":n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(2)+"K":fmt(n,2)};
@@ -24,57 +24,45 @@ function ema(values,period){
 }
 function calculateAnalysis(){
  const candles=state.candles,n=candles.length;
- if(n<55){state.analysis=null;renderAnalysis();if(state.position)renderTradeDesk();return}
- const highs=candles.map(c=>Number(c.high)),lows=candles.map(c=>Number(c.low)),closes=candles.map(c=>Number(c.close));
- const ema20=ema(closes,20),ema50=ema(closes,50),last=closes.at(-1);
- let gains=0,losses=0;
- for(let i=n-14;i<n;i++){const change=closes[i]-closes[i-1];if(change>0)gains+=change;else losses-=change}
+ if(n<20){state.analysis=null;renderAnalysis();return}
+ const highs=candles.map(c=>Number(c.high)),lows=candles.map(c=>Number(c.low)),opens=candles.map(c=>Number(c.open)),closes=candles.map(c=>Number(c.close)),last=closes.at(-1);
+ const ema20=ema(closes,20),ema50=ema(closes,50);
+ let gains=0,losses=0;for(let i=Math.max(1,n-14);i<n;i++){const d=closes[i]-closes[i-1];if(d>0)gains+=d;else losses-=d}
  const rs=losses===0?Infinity:(gains/14)/(losses/14),rsi=losses===0?100:100-(100/(1+rs));
- const swingHighs=[],swingLows=[];
- for(let i=2;i<n-2;i++){
-  if(highs[i]>highs[i-1]&&highs[i]>highs[i-2]&&highs[i]>=highs[i+1]&&highs[i]>=highs[i+2])swingHighs.push({index:i,price:highs[i]});
-  if(lows[i]<lows[i-1]&&lows[i]<lows[i-2]&&lows[i]<=lows[i+1]&&lows[i]<=lows[i+2])swingLows.push({index:i,price:lows[i]});
+ const pivots=(radius)=>{const ph=[],pl=[];for(let i=radius;i<n-radius;i++){let isHigh=true,isLow=true;for(let j=1;j<=radius;j++){if(highs[i]<=highs[i-j]||highs[i]<highs[i+j])isHigh=false;if(lows[i]>=lows[i-j]||lows[i]>lows[i+j])isLow=false}if(isHigh)ph.push({index:i,price:highs[i]});if(isLow)pl.push({index:i,price:lows[i]})}return {highs:ph,lows:pl}};
+ const internal=pivots(2),external=pivots(4),majorHighs=external.highs,majorLows=external.lows;
+ const lastTwo=(arr)=>arr.slice(-2),h2=lastTwo(majorHighs),l2=lastTwo(majorLows);
+ let structure="RANGING",structureDetail="Waiting for confirmed external swing sequence",bias="NEUTRAL";
+ if(h2.length===2&&l2.length===2){const hh=h2[1].price>h2[0].price,hl=l2[1].price>l2[0].price,lh=h2[1].price<h2[0].price,ll=l2[1].price<l2[0].price;if(hh&&hl){structure="BULLISH STRUCTURE";bias="BULLISH"}else if(lh&&ll){structure="BEARISH STRUCTURE";bias="BEARISH"}structureDetail=(hh?"HH":lh?"LH":"Unconfirmed high")+" · "+(hl?"HL":ll?"LL":"Unconfirmed low")}
+ const events=[],breaks=[];let workingBias=bias;
+ const seenHigh=new Set(),seenLow=new Set();
+ for(let i=Math.max(1,n-180);i<n;i++){
+  const priorHigh=[...majorHighs].reverse().find(p=>p.index<i-4),priorLow=[...majorLows].reverse().find(p=>p.index<i-4);
+  if(priorHigh&&!seenHigh.has(priorHigh.index)&&closes[i]>priorHigh.price&&closes[i-1]<=priorHigh.price){const change=workingBias==="BEARISH",event={name:change?"Bullish CHoCH":"Bullish BOS",kind:change?"CHoCH":"BOS",price:priorHigh.price,index:i,bearish:false,brokenSwing:priorHigh};events.push(event);breaks.push(event);seenHigh.add(priorHigh.index);workingBias="BULLISH"}
+  if(priorLow&&!seenLow.has(priorLow.index)&&closes[i]<priorLow.price&&closes[i-1]>=priorLow.price){const change=workingBias==="BULLISH",event={name:change?"Bearish CHoCH":"Bearish BOS",kind:change?"CHoCH":"BOS",price:priorLow.price,index:i,bearish:true,brokenSwing:priorLow};events.push(event);breaks.push(event);seenLow.add(priorLow.index);workingBias="BEARISH"}
  }
- const recentHighs=swingHighs.slice(-2),recentLows=swingLows.slice(-2);
- let structure="RANGING",structureDetail="Waiting for a clear sequence of confirmed swing highs and lows";
- if(recentHighs.length===2&&recentLows.length===2){
-  const hh=recentHighs[1].price>recentHighs[0].price,hl=recentLows[1].price>recentLows[0].price;
-  const lh=recentHighs[1].price<recentHighs[0].price,ll=recentLows[1].price<recentLows[0].price;
-  if(hh&&hl)structure="BULLISH STRUCTURE";
-  else if(lh&&ll)structure="BEARISH STRUCTURE";
-  structureDetail=(hh?"Higher high":lh?"Lower high":"No higher/lower high")+" · "+(hl?"Higher low":ll?"Lower low":"No higher/lower low");
- }
- const events=[];
- if(recentHighs.length){const h=recentHighs.at(-1);events.push({name:"Swing high",price:h.price,index:h.index,bearish:false})}
- if(recentLows.length){const l=recentLows.at(-1);events.push({name:"Swing low",price:l.price,index:l.index,bearish:true})}
- const previous=closes[n-2],lastHigh=swingHighs.at(-1),lastLow=swingLows.at(-1);
- let breakEvent=null;
- if(lastHigh&&n-1>lastHigh.index&&last>lastHigh.price&&previous<=lastHigh.price)breakEvent={name:structure==="BEARISH STRUCTURE"?"Bullish CHoCH":"Bullish BOS",price:lastHigh.price,bearish:false};
- else if(lastLow&&n-1>lastLow.index&&last<lastLow.price&&previous>=lastLow.price)breakEvent={name:structure==="BULLISH STRUCTURE"?"Bearish CHoCH":"Bearish BOS",price:lastLow.price,bearish:true};
- if(breakEvent)events.unshift(breakEvent);
- const fvgs=[];
- for(let i=Math.max(2,n-30);i<n;i++){
-  if(lows[i]>highs[i-2])fvgs.push({type:"Bullish FVG",low:highs[i-2],high:lows[i],index:i,bearish:false});
-  else if(highs[i]<lows[i-2])fvgs.push({type:"Bearish FVG",low:highs[i],high:lows[i-2],index:i,bearish:true});
- }
+ const latestBreak=breaks.at(-1)||null;
+ const swings=[...majorHighs.slice(-3).map(p=>({...p,name:"HH / LH",bearish:false})),...majorLows.slice(-3).map(p=>({...p,name:"HL / LL",bearish:true}))].sort((a,b)=>a.index-b.index);
  const sweeps=[];
- if(lastHigh&&highs[n-1]>lastHigh.price&&last<lastHigh.price)sweeps.push({type:"Bearish liquidity sweep",price:lastHigh.price,bearish:true,index:n-1});
- if(lastLow&&lows[n-1]<lastLow.price&&last>lastLow.price)sweeps.push({type:"Bullish liquidity sweep",price:lastLow.price,bearish:false,index:n-1});
- const orderBlocks=[];
- if(breakEvent){const bullish=!breakEvent.bearish;for(let i=n-2;i>=Math.max(0,n-12);i--){const down=closes[i]<Number(candles[i].open),up=closes[i]>Number(candles[i].open);if((bullish&&down)||(!bullish&&up)){orderBlocks.push({type:bullish?"Bullish order block":"Bearish order block",low:lows[i],high:highs[i],index:i,bearish:!bullish});break}}}
- const equalTolerance=last*0.001;
- const equalHigh=swingHighs.slice(-12).find((p,i,arr)=>arr.slice(i+1).some(q=>Math.abs(q.price-p.price)<=equalTolerance));
- const equalLow=swingLows.slice(-12).find((p,i,arr)=>arr.slice(i+1).some(q=>Math.abs(q.price-p.price)<=equalTolerance));
- let score=0;
- if(ema20>ema50)score++;else score--;
- if(last>ema20)score++;else score--;
- if(rsi>=55)score++;else if(rsi<=45)score--;
- if(structure==="BULLISH STRUCTURE")score++;else if(structure==="BEARISH STRUCTURE")score--;
- if(breakEvent)score+=breakEvent.bearish?-1:1;
- const bias=score>=2?"BULLISH":score<=-2?"BEARISH":"NEUTRAL";
- state.analysis={ema20,ema50,rsi,structure,structureDetail,events,fvgs:fvgs,orderBlocks,sweeps,liquidity:{equalHigh,equalLow},bias,score,last};
+ for(const p of internal.highs.slice(-35)){const hit=candles.slice(p.index+1).findIndex((c,j)=>p.index+1+j<n-1&&highs[p.index+1+j]>p.price&&closes[p.index+1+j]<p.price);if(hit>=0){const i=p.index+1+hit;sweeps.push({type:"Buy-side liquidity sweep",price:p.price,index:i,bearish:true})}}
+ for(const p of internal.lows.slice(-35)){const hit=candles.slice(p.index+1).findIndex((c,j)=>p.index+1+j<n-1&&lows[p.index+1+j]<p.price&&closes[p.index+1+j]>p.price);if(hit>=0){const i=p.index+1+hit;sweeps.push({type:"Sell-side liquidity sweep",price:p.price,index:i,bearish:false})}}
+ const inducements=[];
+ for(const br of breaks.slice(-12)){const candidates=br.bearish?internal.highs:internal.lows;const start=Math.max(0,br.index-24);const candidate=candidates.filter(p=>p.index>=start&&p.index<br.index).reverse().find(p=>sweeps.some(sw=>sw.index>p.index&&sw.index<br.index&&Math.abs(sw.price-p.price)<=Math.max(last*.0005,1e-12)));if(candidate){const sw=sweeps.filter(x=>x.index>candidate.index&&x.index<br.index).at(-1);if(sw)inducements.push({type:"Inducement (IDM)",price:candidate.price,index:sw.index,bearish:br.bearish,breakIndex:br.index,confirmedBy:br.name})}}
+ const fvgs=[];
+ for(let i=Math.max(2,n-160);i<n;i++){if(lows[i]>highs[i-2])fvgs.push({type:"Bullish FVG",low:highs[i-2],high:lows[i],index:i,bearish:false});else if(highs[i]<lows[i-2])fvgs.push({type:"Bearish FVG",low:highs[i],high:lows[i-2],index:i,bearish:true})}
+ const ifvgs=[];for(const z of fvgs){const later=closes.slice(z.index+1).findIndex(c=>z.bearish?c>z.high:c<z.low);if(later>=0){const index=z.index+1+later;if(index<n-1)ifvgs.push({type:z.bearish?"Bullish IFVG":"Bearish IFVG",low:z.low,high:z.high,index,bearish:!z.bearish})}}
+ const orderBlocks=[];for(const br of breaks.slice(-20)){for(let i=br.index-1;i>=Math.max(0,br.index-12);i--){if((!br.bearish&&closes[i]<opens[i])||(br.bearish&&closes[i]>opens[i])){orderBlocks.push({type:br.bearish?"Bearish Order Block":"Bullish Order Block",low:lows[i],high:highs[i],index:i,bearish:br.bearish,breakIndex:br.index});break}}}
+ const breakers=[],mitigationBlocks=[];for(const ob of orderBlocks){const invalid=closes.slice(ob.breakIndex+1).findIndex(c=>ob.bearish?c>ob.high:c<ob.low);if(invalid>=0){const index=ob.breakIndex+1+invalid;breakers.push({type:ob.bearish?"Bullish Breaker Block":"Bearish Breaker Block",low:ob.low,high:ob.high,index,bearish:!ob.bearish})}else{const retest= candles.slice(ob.breakIndex+1).findIndex(c=>+c.low<=ob.high&&+c.high>=ob.low);if(retest>=0){const index=ob.breakIndex+1+retest;mitigationBlocks.push({type:"Mitigation Block candidate",low:ob.low,high:ob.high,index,bearish:ob.bearish})}}}
+ const tolerance=last*.001,equal=(arr)=>arr.slice(-30).flatMap((p,i)=>arr.slice(i+1).filter(q=>Math.abs(q.price-p.price)<=tolerance).map(q=>({price:(p.price+q.price)/2,index:q.index,firstIndex:p.index}))).at(-1)||null;
+ const equalHigh=equal(internal.highs),equalLow=equal(internal.lows);
+ const rangeHigh=majorHighs.at(-1)||internal.highs.at(-1),rangeLow=majorLows.at(-1)||internal.lows.at(-1),range=rangeHigh&&rangeLow?{high:Math.max(rangeHigh.price,rangeLow.price),low:Math.min(rangeHigh.price,rangeLow.price)}:null,mid=range?(range.high+range.low)/2:null;
+ const zone=mid===null?"UNKNOWN":last>mid?"PREMIUM":"DISCOUNT";
+ const score=(ema20>ema50?1:-1)+(last>ema20?1:-1)+(rsi>=55?1:rsi<=45?-1:0)+(bias==="BULLISH"?1:bias==="BEARISH"?-1:0)+(latestBreak?(latestBreak.bearish?-1:1):0);
+ const finalBias=score>=2?"BULLISH":score<=-2?"BEARISH":"NEUTRAL";
+ state.analysis={ema20,ema50,rsi,structure,structureDetail,events:events.slice(-15).reverse(),swings,fvgs,ifvgs,orderBlocks,breakers,mitigationBlocks,sweeps:sweeps.slice(-20),inducements,liquidity:{equalHigh,equalLow},dealingRange:range,equilibrium:mid,premiumDiscount:zone,bias:finalBias,score,last,internal,external,latestBreak};
  renderAnalysis();if(state.position)renderTradeDesk();
 }
+
 function renderAnalysis(){
  const a=state.analysis;
  if(!a){$("analysisState").textContent="NEED MORE DATA";$("analysisBias").textContent="—";$("analysisReason").textContent="At least 55 candles are required for stable EMA 50 analysis.";$("analysisScore").textContent="—";$("analysisScoreLabel").textContent="Not enough data";return}
@@ -87,15 +75,15 @@ function renderAnalysis(){
  $("analysisRsi").textContent=a.rsi.toFixed(1);$("analysisRsiDetail").textContent=a.rsi>=70?"Overbought zone":a.rsi<=30?"Oversold zone":a.rsi>=50?"Above midpoint":"Below midpoint";
  const highs=a.liquidity.equalHigh,lows=a.liquidity.equalLow;
  $("analysisLiquidity").textContent=(highs?"EQH":"")+(highs&&lows?" / ":"")+(lows?"EQL":"")||"No equal levels";
- $("analysisLiquidityDetail").textContent=(highs?"EQH near "+fmt(highs.price):"No confirmed EQH")+" · "+(lows?"EQL near "+fmt(lows.price):"No confirmed EQL");
+ $("analysisLiquidityDetail").textContent=(highs?"EQH near "+fmt(highs.price):"No confirmed EQH")+" · "+(lows?"EQL near "+fmt(lows.price):"No confirmed EQL")+" · "+a.premiumDiscount;
  const eventHost=$("structureEvents");eventHost.replaceChildren();
  const eventRows=a.events.slice(0,4);
  if(!eventRows.length)eventHost.textContent="No confirmed swing events in the current window.";
  eventRows.forEach(item=>{const row=document.createElement("div");row.className="analysis-event";const name=document.createElement("b");name.textContent=item.name;if(item.bearish)name.classList.add("bearish");const value=document.createElement("span");value.textContent=fmt(item.price);row.append(name,value);eventHost.appendChild(row)});
- const extra=[...a.sweeps,...a.orderBlocks];extra.slice(-4).forEach(item=>{const row=document.createElement("div");row.className="analysis-event";const name=document.createElement("b");name.textContent=item.type;if(item.bearish)name.classList.add("bearish");const value=document.createElement("span");value.textContent=fmt(item.price??item.low)+" – "+fmt(item.high??item.price);row.append(name,value);eventHost.appendChild(row)});
+ const extra=[...a.inducements,...a.sweeps,...a.orderBlocks,...a.breakers,...a.mitigationBlocks];extra.slice(-12).reverse().forEach(item=>{const row=document.createElement("div");row.className="analysis-event";const name=document.createElement("b");name.textContent=item.type;if(item.bearish)name.classList.add("bearish");const value=document.createElement("span");value.textContent=fmt(item.price??item.low)+" – "+fmt(item.high??item.price);row.append(name,value);eventHost.appendChild(row)});
  const fvgHost=$("fvgEvents");fvgHost.replaceChildren();
  if(!a.fvgs.length)fvgHost.textContent="No recent three-candle imbalance detected.";
- a.fvgs.slice(-4).reverse().forEach(item=>{const row=document.createElement("div");row.className="analysis-event";const name=document.createElement("b");name.textContent=item.type;if(item.bearish)name.classList.add("bearish");const value=document.createElement("span");value.textContent=fmt(item.low)+" – "+fmt(item.high);row.append(name,value);fvgHost.appendChild(row)});
+ [...a.fvgs.slice(-4),...a.ifvgs.slice(-4)].reverse().forEach(item=>{const row=document.createElement("div");row.className="analysis-event";const name=document.createElement("b");name.textContent=item.type;if(item.bearish)name.classList.add("bearish");const value=document.createElement("span");value.textContent=fmt(item.low)+" – "+fmt(item.high);row.append(name,value);fvgHost.appendChild(row)});
 }
 function indicatorSeries(values,period,type="ema"){
  if(values.length<period)return values.map(()=>null);
@@ -143,7 +131,7 @@ function drawChart(){
  if(state.indicators.ema20)line(ema20,"#e9c46a");if(state.indicators.ema50)line(ema50,"#76b9e8");if(state.indicators.sma200)line(sma200,"#c79bff");
  if(state.indicators.bb){line(mid,"#9ba9bb",[4,3]);line(mid.map((v,i)=>v===null?null:v+2*(sd[i]||0)),"#8294a866",[3,3]);line(mid.map((v,i)=>v===null?null:v-2*(sd[i]||0)),"#8294a866",[3,3])}
  const a=state.analysis;
- if(a){if(state.confirmations.fvg)a.fvgs.slice(-20).forEach(z=>{const xx=x(z.index);if(xx<pad.left||xx>width-pad.right)return;ctx.fillStyle=z.bearish?"#f17e8c19":"#70e5bd19";ctx.strokeStyle=z.bearish?"#f17e8c66":"#70e5bd66";const top=y(z.high),bottom=y(z.low),w=Math.max(1,width-pad.right-xx),h=Math.max(2,bottom-top);ctx.fillRect(xx,top,w,h);ctx.strokeRect(xx,top,w,h)});if(state.confirmations.ob)a.orderBlocks.slice(-6).forEach(z=>{const xx=x(z.index);ctx.fillStyle=z.bearish?"#f17e8c22":"#70e5bd22";ctx.strokeStyle=z.bearish?"#f17e8c88":"#70e5bd88";ctx.fillRect(xx,y(z.high),Math.max(1,width-pad.right-xx),Math.max(2,y(z.low)-y(z.high)));ctx.strokeRect(xx,y(z.high),Math.max(1,width-pad.right-xx),Math.max(2,y(z.low)-y(z.high)))});if(state.confirmations.structure&&a.events[0]){const e=a.events[0];ctx.fillStyle=e.bearish?"#f17e8c":"#70e5bd";ctx.font="9px DM Mono";ctx.textAlign="left";ctx.fillText(e.name,pad.left+5,y(e.price)-7)}}
+ if(a){if(state.confirmations.fvg)a.fvgs.slice(-20).forEach(z=>{const xx=x(z.index);if(xx<pad.left||xx>width-pad.right)return;ctx.fillStyle=z.bearish?"#f17e8c19":"#70e5bd19";ctx.strokeStyle=z.bearish?"#f17e8c66":"#70e5bd66";const top=y(z.high),bottom=y(z.low),w=Math.max(1,width-pad.right-xx),h=Math.max(2,bottom-top);ctx.fillRect(xx,top,w,h);ctx.strokeRect(xx,top,w,h)});if(state.confirmations.ifvg)a.ifvgs.slice(-12).forEach(z=>{const xx=x(z.index);ctx.fillStyle=z.bearish?"#f17e8c33":"#70e5bd33";ctx.strokeStyle=z.bearish?"#f17e8caa":"#70e5bdaa";ctx.fillRect(xx,y(z.high),Math.max(1,width-pad.right-xx),Math.max(2,y(z.low)-y(z.high)));ctx.strokeRect(xx,y(z.high),Math.max(1,width-pad.right-xx),Math.max(2,y(z.low)-y(z.high)))});if(state.confirmations.ob)a.orderBlocks.slice(-6).forEach(z=>{const xx=x(z.index);ctx.fillStyle=z.bearish?"#f17e8c22":"#70e5bd22";ctx.strokeStyle=z.bearish?"#f17e8c88":"#70e5bd88";ctx.fillRect(xx,y(z.high),Math.max(1,width-pad.right-xx),Math.max(2,y(z.low)-y(z.high)));ctx.strokeRect(xx,y(z.high),Math.max(1,width-pad.right-xx),Math.max(2,y(z.low)-y(z.high)))});if(state.confirmations.breakers)a.breakers.slice(-5).forEach(z=>{const xx=x(z.index);ctx.strokeStyle=z.bearish?"#f17e8c":"#70e5bd";ctx.setLineDash([2,3]);ctx.strokeRect(xx,y(z.high),Math.max(1,width-pad.right-xx),Math.max(2,y(z.low)-y(z.high)));ctx.setLineDash([])});if(state.confirmations.idm)a.inducements.slice(-8).forEach(z=>{const xx=x(z.index),yy=y(z.price);ctx.fillStyle="#f2c879";ctx.font="8px DM Mono";ctx.fillText("IDM",xx,yy-5);ctx.strokeStyle="#f2c87988";ctx.setLineDash([2,3]);ctx.beginPath();ctx.moveTo(xx,yy);ctx.lineTo(width-pad.right,yy);ctx.stroke();ctx.setLineDash([])});if(state.confirmations.structure&&a.events[0]){const e=a.events[0];ctx.fillStyle=e.bearish?"#f17e8c":"#70e5bd";ctx.font="9px DM Mono";ctx.textAlign="left";ctx.fillText(e.name,pad.left+5,y(e.price)-7)}}
  state.drawings.forEach(d=>drawManualMark(ctx,d,x,y,pad,width,height));
  if(position&&position.symbol===state.symbol)drawPosition(ctx,position,y,pad,width);
  const last=data.at(-1),lastY=y(+last.close);ctx.setLineDash([4,4]);ctx.strokeStyle="#70e5bd88";ctx.beginPath();ctx.moveTo(pad.left,lastY);ctx.lineTo(width-pad.right,lastY);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#173d36";ctx.fillRect(width-pad.right+4,lastY-9,74,18);ctx.fillStyle="#a2f4d9";ctx.textAlign="center";ctx.fillText(fmt(last.close),width-pad.right+41,lastY+3);
@@ -171,7 +159,7 @@ function renderTradeDesk(){
  const p=state.position,active=!!p;$("tradeDeskEmpty").classList.toggle("hidden",active);$("tradeDeskActive").classList.toggle("hidden",!active);$("tradeDeskStatus").textContent=active?"ONE ACTIVE SETUP":"NO ACTIVE SETUP";
  if(!p)return;$("deskDirection").textContent=p.direction+" · "+p.symbol;$("deskRiskReward").textContent="R:R 1:3";
  $("deskEntry").textContent=fmt(p.entry);$("deskStop").textContent=fmt(p.stop);$("deskTp1").textContent=fmt(p.tp1);$("deskTp2").textContent=fmt(p.tp2);$("deskTp3").textContent=fmt(p.tp3);
- const a=state.analysis,host=$("deskConfirmations");host.replaceChildren();const recentVol=state.candles.slice(-20).map(c=>Number(c.volume||0)),volAvg=recentVol.length?recentVol.reduce((x,y)=>x+y,0)/recentVol.length:0,volOk=recentVol.length>1&&recentVol.at(-1)>volAvg;const checks=[["EMA","ema",a&&((p.direction==="LONG"&&a.ema20>a.ema50)||(p.direction==="SHORT"&&a.ema20<a.ema50))],["RSI","rsi",a&&(p.direction==="LONG"?a.rsi>50:a.rsi<50)],["Structure","structure",a&&(p.direction==="LONG"?a.structure==="BULLISH STRUCTURE":a.structure==="BEARISH STRUCTURE")],["FVG","fvg",a&&a.fvgs.some(z=>!z.bearish=== (p.direction==="LONG"))],["Volume","volume",volOk],["Liquidity sweep","liquidity",a&&a.sweeps.some(z=>z.bearish===(p.direction==="SHORT"))],["Order block","ob",a&&a.orderBlocks.some(z=>z.bearish===(p.direction==="SHORT"))],["EQH / EQL","eq",a&&!!(p.direction==="LONG"?a.liquidity.equalLow:a.liquidity.equalHigh)]];
+ const a=state.analysis,host=$("deskConfirmations");host.replaceChildren();const recentVol=state.candles.slice(-20).map(c=>Number(c.volume||0)),volAvg=recentVol.length?recentVol.reduce((x,y)=>x+y,0)/recentVol.length:0,volOk=recentVol.length>1&&recentVol.at(-1)>volAvg;const checks=[["EMA","ema",a&&((p.direction==="LONG"&&a.ema20>a.ema50)||(p.direction==="SHORT"&&a.ema20<a.ema50))],["RSI","rsi",a&&(p.direction==="LONG"?a.rsi>50:a.rsi<50)],["Structure","structure",a&&(p.direction==="LONG"?a.structure==="BULLISH STRUCTURE":a.structure==="BEARISH STRUCTURE")],["FVG","fvg",a&&a.fvgs.some(z=>!z.bearish===(p.direction==="LONG"))],["IFVG","ifvg",a&&a.ifvgs.some(z=>!z.bearish===(p.direction==="LONG"))],["Volume","volume",volOk],["Liquidity sweep","liquidity",a&&a.sweeps.some(z=>z.bearish===(p.direction==="SHORT"))],["Inducement","idm",a&&a.inducements.some(z=>z.bearish===(p.direction==="SHORT"))],["Order block","ob",a&&a.orderBlocks.some(z=>z.bearish===(p.direction==="SHORT"))],["Breaker block","breakers",a&&a.breakers.some(z=>z.bearish===(p.direction==="SHORT"))],["EQH / EQL","eq",a&&!!(p.direction==="LONG"?a.liquidity.equalLow:a.liquidity.equalHigh)]];
  checks.filter(([,key])=>state.confirmations[key]).forEach(([name,key,ok])=>{const el=document.createElement("span");el.className=ok?"confirm-ok":"confirm-pending";el.textContent=(ok?"✓ ":"○ ")+name;host.appendChild(el)});
 }
 
@@ -191,33 +179,20 @@ async function loadOlderHistory(){
 }
 function updateCandle(k){
  const candle={open_time:k.t,open:k.o,high:k.h,low:k.l,close:k.c,volume:k.v},last=state.candles.at(-1);
- if(last&&Number(last.open_time)===Number(candle.open_time))state.candles[state.candles.length-1]=candle;else state.candles.push(candle);
- if(state.candles.length>1000)state.candles.shift();if(state.view.follow)state.view.end=state.candles.length;calculateAnalysis();drawChart();setPrice(candle.close);
+ if(last&&Number(last.open_time)===Number(candle.open_time)){const liveClose=Number(last.close),liveHigh=Number(last.high),liveLow=Number(last.low);candle.high=Math.max(Number(candle.high),liveHigh);candle.low=Math.min(Number(candle.low),liveLow);if(!k.x&&liveClose!==Number(candle.close))candle.close=String(liveClose);state.candles[state.candles.length-1]=candle}else state.candles.push(candle);
+ if(state.candles.length>5000)state.candles.shift();if(state.view.follow)state.view.end=state.candles.length;if(k.x)calculateAnalysis();scheduleMarketPaint();setPrice(candle.close);
 }
 async function loadSymbols(){
- try{
-  const data=await api(API+"/market/symbols");state.symbols=(data.symbols||[]).filter(item=>item.status==="TRADING");state.symbolSet=new Set(state.symbols.map(item=>item.symbol));
-  $("pairCount").textContent=state.symbols.length.toLocaleString("en-US");
-  const list=$("pairOptions");list.replaceChildren();
-  const fragment=document.createDocumentFragment();
-  state.symbols.forEach(item=>{const option=document.createElement("option");option.value=item.symbol;option.label=item.base_asset+" / "+item.quote_asset;fragment.appendChild(option)});
-  list.appendChild(fragment);
-  if(!state.symbols.some(item=>item.symbol===state.symbol))state.symbol="BTCUSDT";
-  $("pairSearch").value=state.symbol;health("localHealth","Online",true);return state.symbols;
- }catch(error){health("localHealth","API error",false);return []}
+ try{const data=await api(API+"/market/symbols");state.symbols=(data.symbols||[]).filter(item=>item.status==="TRADING").sort((a,b)=>a.symbol.localeCompare(b.symbol));state.symbolSet=new Set(state.symbols.map(item=>item.symbol));$("pairCount").textContent=state.symbols.length.toLocaleString("en-US");if(!state.symbols.some(item=>item.symbol===state.symbol))state.symbol="BTCUSDT";renderPairSuggestions($("pairSearch").value);health("localHealth","Online",true);return state.symbols}catch(error){health("localHealth","API error",false);return []}
 }
 function selectSymbol(symbol){
  state.symbol=symbol;state.view={end:0,visible:120,follow:true};loadWorkspaceMarks();try{localStorage.setItem("nexora-selected-symbol",symbol)}catch(error){}$("pairSearch").value=symbol;$("statSymbol").textContent=symbol;$("chartTitle").innerHTML=symbol+" <span>·</span> "+state.interval.toUpperCase();
  $("bookMidPrice").textContent="—";$("bookSpread").textContent="Spread —";$("asks").innerHTML='<div class="book-empty">Loading ask depth…</div>';$("bids").innerHTML='<div class="book-empty">Loading bid depth…</div>';
  state.book={bids:[],asks:[]};state.bookLastUpdateAt=0;$("depthStatus").textContent="WAITING";$("depthStatus").classList.remove("live-tag");state.trades=[];renderPressure();loadCandles().then(startLive);
 }
-function searchPair(){
- const query=$("pairSearch").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
- if(!query)return;
- const match=state.symbols.find(item=>item.symbol===query);
- if(!match){$("pairSearch").setCustomValidity("Pair not found in Binance Spot trading symbols.");$("pairSearch").reportValidity();return}
- $("pairSearch").setCustomValidity("");selectSymbol(match.symbol);
-}
+function renderPairSuggestions(query=""){
+ const host=$("pairSuggestions");if(!host)return;const q=query.trim().toUpperCase();const matches=q?state.symbols.filter(item=>item.symbol.includes(q)||item.base_asset.includes(q)||item.quote_asset.includes(q)):state.symbols;state.searchMatches=matches;host.replaceChildren();const fragment=document.createDocumentFragment();matches.forEach(item=>{const row=document.createElement("button");row.type="button";row.className="pair-option";const symbol=document.createElement("b");symbol.textContent=item.symbol;const assets=document.createElement("span");assets.textContent=item.base_asset+" / "+item.quote_asset;row.append(symbol,assets);row.addEventListener("click",()=>{host.classList.add("hidden");selectSymbol(item.symbol)});fragment.appendChild(row)});host.appendChild(fragment);$("pairSuggestionCount").textContent=matches.length.toLocaleString()+" pairs";host.classList.toggle("hidden",document.activeElement!==$("pairSearch")&& !q);}
+function searchPair(){const query=$("pairSearch").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");if(!query)return;const match=state.symbols.find(item=>item.symbol===query);if(match){$("pairSuggestions").classList.add("hidden");selectSymbol(match.symbol);return}renderPairSuggestions(query);$("pairSuggestions").classList.remove("hidden");}
 function renderMovers(){
  const rows=[...state.tickerMap.values()].filter(t=>state.symbolSet.has(t.s)).map(t=>{const history=state.priceHistory.get(t.s)||[],oldest=history[0],fastMove=oldest&&oldest.price&&Date.now()-oldest.time>=60000?((Number(t.c)/oldest.price)-1)*100:Number(t.P||0);return {...t,fastMove}}).sort((a,b)=>Math.abs(b.fastMove)-Math.abs(a.fastMove)).slice(0,12);
  const host=$("moversList");host.replaceChildren();
@@ -268,11 +243,12 @@ function updateBook(data){
  if(!Array.isArray(data.bids)||!Array.isArray(data.asks))return;
  state.book={bids:data.bids,asks:data.asks};state.bookLastUpdateAt=Date.now();renderBook();
 }
+function intervalMs(interval){return ({"1m":60000,"3m":180000,"5m":300000,"15m":900000,"30m":1800000,"1h":3600000,"2h":7200000,"4h":14400000,"6h":21600000,"8h":28800000,"12h":43200000,"1d":86400000,"3d":259200000,"1w":604800000})[interval]||60000}
+function scheduleMarketPaint(){if(state.paintQueued)return;state.paintQueued=true;requestAnimationFrame(()=>{state.paintQueued=false;drawChart()})}
+function scheduleAnalysis(){const now=performance.now();if(state.analysisQueued||now-state.lastAnalysisAt<350)return;state.analysisQueued=true;requestAnimationFrame(()=>{state.analysisQueued=false;state.lastAnalysisAt=performance.now();calculateAnalysis();scheduleMarketPaint()})}
 function updateTrade(trade){
- const buyerInitiated=!trade.m;
- state.trades.push({buy:buyerInitiated,qty:Number(trade.q||0)});
- if(state.trades.length>300)state.trades.shift();
- if(trade.s===state.symbol){setPrice(trade.p);$("priceFoot").textContent="Live trade · "+new Date().toLocaleTimeString()}
+ const buyerInitiated=!trade.m;state.trades.push({buy:buyerInitiated,qty:Number(trade.q||0)});if(state.trades.length>300)state.trades.shift();
+ if(trade.s===state.symbol){const price=Number(trade.p),last=state.candles.at(-1),time=Number(trade.T||Date.now()),duration=intervalMs(state.interval);setPrice(price);$("priceFoot").textContent="Live trade · "+new Date(time).toLocaleTimeString();if(last&&time>=Number(last.open_time)&&time<Number(last.open_time)+duration){last.high=Math.max(Number(last.high),price);last.low=Math.min(Number(last.low),price);last.close=price;last.volume=Number(last.volume||0)+Number(trade.q||0);if(state.view.follow)state.view.end=state.candles.length;scheduleMarketPaint();scheduleAnalysis()}}
  renderPressure();
 }
 function renderPressure(){
@@ -431,8 +407,7 @@ function bindChartTools(){
 function init(){
  bindChartTools();loadWorkspaceMarks();window.addEventListener("storage",event=>{if(event.key==="nexora-active-position"){try{state.position=JSON.parse(event.newValue||"null")}catch(error){state.position=null}renderTradeDesk();drawChart()}});
  try{state.symbol=localStorage.getItem("nexora-selected-symbol")||state.symbol;state.interval=localStorage.getItem("nexora-selected-interval")||state.interval;const active=document.querySelector('[data-interval="'+state.interval+'"]');if(active){document.querySelectorAll("[data-interval]").forEach(item=>item.classList.remove("selected"));active.classList.add("selected")}}catch(error){}
- $("searchPairBtn").addEventListener("click",searchPair);$("pairSearch").addEventListener("keydown",event=>{if(event.key==="Enter")searchPair()});
- $("pairSearch").addEventListener("input",()=>$("pairSearch").setCustomValidity(""));
+ $("searchPairBtn").addEventListener("click",searchPair);$("pairSearch").addEventListener("focus",()=>{renderPairSuggestions($("pairSearch").value);$("pairSuggestions").classList.remove("hidden")});$("pairSearch").addEventListener("input",()=>{renderPairSuggestions($("pairSearch").value);$("pairSuggestions").classList.remove("hidden")});$("pairSearch").addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();searchPair()}if(event.key==="Escape")$("pairSuggestions").classList.add("hidden")});document.addEventListener("click",event=>{if(!event.target.closest(".search-controls"))$("pairSuggestions").classList.add("hidden")});
  document.querySelectorAll("[data-interval]").forEach(button=>button.addEventListener("click",()=>{
   document.querySelectorAll("[data-interval]").forEach(item=>item.classList.remove("selected"));button.classList.add("selected");state.interval=button.dataset.interval;try{localStorage.setItem("nexora-selected-interval",state.interval)}catch(error){}
   $("chartTitle").innerHTML=state.symbol+" <span>·</span> "+state.interval.toUpperCase();loadCandles().then(startLive);
