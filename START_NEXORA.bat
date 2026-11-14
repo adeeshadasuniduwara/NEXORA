@@ -82,11 +82,19 @@ echo.
 echo [UPDATE] Applying update. This same CMD window will restart NEXORA...
 set "UPDATE_WAIT=0"
 :wait_update_loop
-if not exist ".nexora_updates\.pending" goto run_server
+if not exist ".nexora_updates\.pending" goto update_dependencies
 set /a UPDATE_WAIT+=1
 if %UPDATE_WAIT% GEQ 180 goto update_timeout
 timeout /t 1 /nobreak >nul
 goto wait_update_loop
+
+:update_dependencies
+echo [UPDATE] Checking dependencies for the new version...
+"%VPY%" -m pip install --disable-pip-version-check --retries 5 --timeout 30 -r "%~dp0backend\\requirements.txt"
+if errorlevel 1 goto install_retry
+"%VPY%" -m pip check
+if errorlevel 1 goto install_retry
+goto run_server
 
 :update_timeout
 echo.
