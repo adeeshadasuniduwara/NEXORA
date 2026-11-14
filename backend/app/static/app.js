@@ -1,5 +1,5 @@
 const API="/api/v1";
-const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],analysis:null,view:{end:0,visible:120,follow:true},indicators:{ema20:true,ema50:true,sma200:false,bb:false,rsi:true},confirmations:{structure:true,fvg:true,ob:true,liquidity:true,eq:true,ema:true,rsi:true,volume:false},drawTool:"cursor",drawings:[],draft:null,position:null,dragging:null,socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]}};
+const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],analysis:null,view:{end:0,visible:120,follow:true},historyLoading:false,historyExhausted:false,indicators:{ema20:true,ema50:true,sma200:false,bb:false,rsi:true},confirmations:{structure:true,fvg:true,ob:true,liquidity:true,eq:true,ema:true,rsi:true,volume:false},drawTool:"cursor",drawings:[],draft:null,position:null,dragging:null,socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]}};
 const $=id=>document.getElementById(id);
 const fmt=(v,max=8)=>Number(v||0).toLocaleString("en-US",{maximumFractionDigits:max});
 const compact=v=>{const n=Number(v||0);return n>=1e9?(n/1e9).toFixed(2)+"B":n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(2)+"K":fmt(n,2)};
@@ -174,6 +174,20 @@ function renderTradeDesk(){
  checks.filter(([,key])=>state.confirmations[key]).forEach(([name,key,ok])=>{const el=document.createElement("span");el.className=ok?"confirm-ok":"confirm-pending";el.textContent=(ok?"✓ ":"○ ")+name;host.appendChild(el)});
 }
 
+async function loadOlderHistory(){
+ if(state.historyLoading||state.historyExhausted||!state.candles.length)return;
+ state.historyLoading=true;
+ try{
+  const first=state.candles[0],endTime=new Date(Number(first.open_time)).toISOString();
+  const data=await api(`${API}/market/candles?symbol=${encodeURIComponent(state.symbol)}&interval=${state.interval}&limit=1000&end_time=${encodeURIComponent(endTime)}`);
+  const older=(data.candles||[]).filter(c=>Number(c.open_time)<Number(first.open_time));
+  if(!older.length){state.historyExhausted=true;return}
+  const oldEnd=state.view.end||state.candles.length;
+  state.candles=older.concat(state.candles).slice(-5000);
+  const added=older.length;state.view.end=Math.min(state.candles.length,oldEnd+added);calculateAnalysis();drawChart();
+ }catch(error){$("chartChange").textContent="HISTORY LOAD FAILED · "+String(error.message||error).slice(0,80)}
+ finally{state.historyLoading=false}
+}
 function updateCandle(k){
  const candle={open_time:k.t,open:k.o,high:k.h,low:k.l,close:k.c,volume:k.v},last=state.candles.at(-1);
  if(last&&Number(last.open_time)===Number(candle.open_time))state.candles[state.candles.length-1]=candle;else state.candles.push(candle);
@@ -403,7 +417,7 @@ function bindChartTools(){
   if(state.dragging.level){updatePositionLevel(state.dragging.level,priceAt(event.clientY));return}
   if(state.dragging.pan&&pointerStart!==null){
    const rect=canvas.getBoundingClientRect(),step=(rect.width-92)/state.view.visible,delta=Math.round((pointerStart-event.clientX)/step);
-   state.view.end=Math.max(state.view.visible,Math.min(state.candles.length,state.dragging.startEnd+delta));state.view.follow=state.view.end>=state.candles.length;$("liveChartBtn").classList.toggle("tool-active",state.view.follow);drawChart();
+   state.view.end=Math.max(state.view.visible,Math.min(state.candles.length,state.dragging.startEnd+delta));state.view.follow=state.view.end>=state.candles.length;$("liveChartBtn").classList.toggle("tool-active",state.view.follow);drawChart();if(state.view.end<=state.view.visible+2&&delta>0)loadOlderHistory();
   }
  });
  const finish=()=>{if(state.dragging?.level)saveWorkspaceMarks();state.dragging=null;pointerStart=null};
