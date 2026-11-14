@@ -82,7 +82,7 @@ echo.
 echo [UPDATE] Applying update. This same CMD window will restart NEXORA...
 set "UPDATE_WAIT=0"
 :wait_update_loop
-if not exist ".nexora_update_pending" goto run_server
+if not exist ".nexora_updates\.pending" goto run_server
 set /a UPDATE_WAIT+=1
 if %UPDATE_WAIT% GEQ 180 goto update_timeout
 timeout /t 1 /nobreak >nul
