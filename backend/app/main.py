@@ -1,16 +1,18 @@
 from fastapi import FastAPI
 
 from app.routes.history import router as history_router
+from app.routes.live import router as live_router
 from app.routes.market import router as market_router
 
 app = FastAPI(
     title="NEXORA API",
-    version="0.2.0",
+    version="0.3.0",
     description="Chart-first crypto market analysis API using public Binance market data.",
 )
 
 app.include_router(market_router, prefix="/api/v1")
 app.include_router(history_router, prefix="/api/v1")
+app.include_router(live_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["system"])
