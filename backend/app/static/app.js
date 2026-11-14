@@ -48,8 +48,8 @@ function calculateAnalysis(){
  if(recentLows.length){const l=recentLows.at(-1);events.push({name:"Swing low",price:l.price,index:l.index,bearish:true})}
  const previous=closes[n-2],lastHigh=swingHighs.at(-1),lastLow=swingLows.at(-1);
  let breakEvent=null;
- if(lastHigh&&last.index>lastHigh.index&&last>lastHigh.price&&previous<=lastHigh.price)breakEvent={name:structure==="BEARISH STRUCTURE"?"Bullish CHoCH":"Bullish BOS",price:lastHigh.price,bearish:false};
- else if(lastLow&&last.index>lastLow.index&&last<lastLow.price&&previous>=lastLow.price)breakEvent={name:structure==="BULLISH STRUCTURE"?"Bearish CHoCH":"Bearish BOS",price:lastLow.price,bearish:true};
+ if(lastHigh&&n-1>lastHigh.index&&last>lastHigh.price&&previous<=lastHigh.price)breakEvent={name:structure==="BEARISH STRUCTURE"?"Bullish CHoCH":"Bullish BOS",price:lastHigh.price,bearish:false};
+ else if(lastLow&&n-1>lastLow.index&&last<lastLow.price&&previous>=lastLow.price)breakEvent={name:structure==="BULLISH STRUCTURE"?"Bearish CHoCH":"Bearish BOS",price:lastLow.price,bearish:true};
  if(breakEvent)events.unshift(breakEvent);
  const fvgs=[];
  for(let i=Math.max(2,n-30);i<n;i++){
