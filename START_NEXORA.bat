@@ -61,11 +61,12 @@ echo.
 echo [START] Launching NEXORA in this window...
 cd /d "%~dp0backend"
 "%VPY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+set "SERVER_EXIT=%ERRORLEVEL%"
 cd /d "%~dp0"
 
 rem A verified update creates this marker before stopping Uvicorn.
-if exist ".nexora_update_pending" goto wait_for_update
-if errorlevel 1 (
+if exist ".nexora_updates\\.pending" goto wait_for_update
+if not "%SERVER_EXIT%"=="0" (
   echo.
   echo [ERROR] NEXORA stopped unexpectedly.
   pause
