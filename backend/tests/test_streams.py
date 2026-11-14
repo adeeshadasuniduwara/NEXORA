@@ -18,14 +18,12 @@ def test_stream_names_reject_invalid_symbol_or_interval():
         stream_names(["BTCUSDT"], ["7m"])
 
 
-@pytest.mark.asyncio
-async def test_client_status_starts_disconnected():
-    client = BinanceStreamClient(["btcusdt@trade"], lambda event: _noop(event))
+def test_client_status_starts_disconnected():
+    async def noop(event):
+        return None
+
+    client = BinanceStreamClient(["btcusdt@trade"], noop)
     status = client.status()
     assert status["connected"] is False
     assert status["stream_count"] == 1
     assert status["reconnects"] == 0
-
-
-async def _noop(event):
-    return None
