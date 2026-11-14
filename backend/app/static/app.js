@@ -1,5 +1,5 @@
 const API="/api/v1";
-const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),trades:[],socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,book:{bids:[],asks:[]}};
+const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,book:{bids:[],asks:[]}};
 const $=id=>document.getElementById(id);
 const fmt=(v,max=8)=>Number(v||0).toLocaleString("en-US",{maximumFractionDigits:max});
 const compact=v=>{const n=Number(v||0);return n>=1e9?(n/1e9).toFixed(2)+"B":n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(2)+"K":fmt(n,2)};
@@ -34,7 +34,7 @@ function updateCandle(k){
 }
 async function loadSymbols(){
  try{
-  const data=await api(API+"/market/symbols");state.symbols=(data.symbols||[]).filter(item=>item.status==="TRADING");
+  const data=await api(API+"/market/symbols");state.symbols=(data.symbols||[]).filter(item=>item.status==="TRADING");state.symbolSet=new Set(state.symbols.map(item=>item.symbol));
   $("pairCount").textContent=state.symbols.length.toLocaleString("en-US");
   const list=$("pairOptions");list.replaceChildren();
   const fragment=document.createDocumentFragment();
@@ -57,7 +57,7 @@ function searchPair(){
  $("pairSearch").setCustomValidity("");selectSymbol(match.symbol);
 }
 function renderMovers(){
- const rows=[...state.tickerMap.values()].filter(t=>state.symbols.some(s=>s.symbol===t.s)).sort((a,b)=>Math.abs(+b.P)-Math.abs(+a.P)).slice(0,12);
+ const rows=[...state.tickerMap.values()].filter(t=>state.symbolSet.has(t.s)).map(t=>{const history=state.priceHistory.get(t.s)||[],oldest=history[0],fastMove=oldest&&oldest.price?((Number(t.c)/oldest.price)-1)*100:Number(t.P||0);return {...t,fastMove}}).sort((a,b)=>Math.abs(b.fastMove)-Math.abs(a.fastMove)).slice(0,12);
  const host=$("moversList");host.replaceChildren();
  if(!rows.length){host.innerHTML='<div class="book-empty">Waiting for live ticker data…</div>';return}
  const fragment=document.createDocumentFragment();
@@ -65,14 +65,14 @@ function renderMovers(){
   const row=document.createElement("button");row.className="mover-row";row.type="button";
   const pair=document.createElement("span");pair.className="mover-pair";pair.textContent=t.s;
   const price=document.createElement("span");price.textContent=fmt(t.c);
-  const change=document.createElement("span");change.className=Number(t.P)>=0?"positive":"negative";change.textContent=(Number(t.P)>0?"+":"")+Number(t.P).toFixed(2)+"%";
+  const change=document.createElement("span");change.className=Number(t.fastMove)>=0?"positive":"negative";change.textContent=(Number(t.fastMove)>0?"+":"")+Number(t.fastMove).toFixed(3)+"%";
   const volume=document.createElement("span");volume.textContent=compact(t.q);
   row.append(pair,price,change,volume);row.addEventListener("click",()=>selectSymbol(t.s));fragment.appendChild(row);
  });
  host.appendChild(fragment);
 }
 function updateTicker(t){
- if(!t||!t.s)return;state.tickerMap.set(t.s,t);
+ if(!t||!t.s)return;state.tickerMap.set(t.s,t);const now=Date.now(),history=state.priceHistory.get(t.s)||[];if(!history.length||history.at(-1).price!==Number(t.c))history.push({time:now,price:Number(t.c)});while(history.length&&now-history[0].time>60000)history.shift();state.priceHistory.set(t.s,history);
  if(t.s===state.symbol){
   setPrice(t.c);const change=Number(t.P||0);$("statChange").textContent=(change>0?"+":"")+change.toFixed(2)+"%";$("statChange").className="stat-value "+(change>=0?"positive":"negative");
   $("statVolume").textContent="24h quote volume "+compact(t.q);$("chartChange").textContent=(change>0?"+":"")+change.toFixed(2)+"% · 24H";
