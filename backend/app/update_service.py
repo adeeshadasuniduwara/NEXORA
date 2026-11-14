@@ -132,6 +132,14 @@ def begin_update() -> dict[str, Any]:
                 "started": False, "reason": "local_changes",
                 "message": "Local Git changes were detected. They were preserved; automatic update was not applied.",
             }
+        branch = subprocess.run(
+            ["git", "branch", "--show-current"], cwd=root, capture_output=True, text=True, timeout=10
+        )
+        if branch.returncode != 0 or branch.stdout.strip() != "main":
+            return {
+                "started": False, "reason": "not_main_branch",
+                "message": "Automatic Git updates require a clean main branch. Your current branch was left unchanged.",
+            }
 
     archive_path = _download_verified_archive(release)
     helper = Path(__file__).with_name("update_helper.py")
