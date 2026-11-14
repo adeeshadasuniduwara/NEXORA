@@ -6,26 +6,39 @@ A chart-first crypto market analysis workspace powered by Binance public market 
 
 - Binance Spot symbol discovery and historical candle retrieval.
 - SQLite-backed historical candle storage and bounded backfill.
-- Binance Spot WebSocket streams for candles, trades, and book ticker events.
-- Local animated browser workspace with a project-owned candlestick renderer.
-- Windows one-click launcher with environment setup, dependency repair, and Git-based updates.
+- Binance Spot WebSocket streams for candles, trades, book ticker events and all-market tickers.
+- Local animated browser workspace with a project-owned candlestick renderer, pair search, live movers and selected-pair order book.
+- Windows launcher with environment setup and dependency repair.
+- Central GitHub Releases updater: running clients check for releases, verify the update archive SHA-256, install the update, restart, and show the release notes and installation time.
 
 ## Architecture
 
-- `backend/` — FastAPI API, Binance REST/WebSocket adapters, and browser UI assets.
+- `backend/` — FastAPI API, Binance REST/WebSocket adapters, updater and browser UI assets.
 - `docs/` — architecture and operational notes.
 - `START_NEXORA.bat` — Windows launcher.
+- `VERSION` and `backend/app/version.py` — current release version (keep these in sync).
 
 ## Windows quick start
 
-1. Install Python 3.10+ and Git for Windows.
+1. Install Python 3.10+ and Git for Windows (Git is required for Git-clone installations).
 2. Clone or download this repository.
 3. Double-click `START_NEXORA.bat`.
 4. The launcher prepares the isolated environment and opens the local workspace at `http://127.0.0.1:8000`.
 
-For a Git clone with a clean working tree, each launch checks `origin/main` and fast-forward updates before startup. If local changes are present, updating is skipped to protect them. ZIP downloads do not contain Git history and cannot self-update through Git.
+## How automatic updates work
 
-See [Windows launcher guide](docs/WINDOWS_LAUNCHER.md).
+1. A change is merged or pushed to `main`.
+2. GitHub Actions runs the backend test suite.
+3. Only after tests pass, the release job packages the app and publishes a versioned GitHub Release with a SHA-256 checksum.
+4. Running NEXORA clients check the latest release every 60 seconds.
+5. When a newer version is found, the client downloads and verifies the package, installs it in a detached helper, and restarts the local server.
+6. After restart, a notification displays the version, release notes, and local installation time.
+
+Every public update must bump the semantic version in both `VERSION` and `backend/app/version.py`. The workflow intentionally fails if that version tag already exists. Git clones update with a fast-forward pull and preserve local modifications; ZIP installations apply only allowlisted application files. Local database/data folders are not included in the update archive.
+
+If a Git clone has uncommitted changes, automatic installation is blocked to protect those changes. If GitHub or the internet is unavailable, NEXORA continues running on the installed version and retries on the next check. Updates restart the local server, so the browser briefly reconnects.
+
+See [Windows launcher guide](docs/WINDOWS_LAUNCHER.md) and [automatic updater guide](docs/AUTO_UPDATER.md).
 
 ## Data limits
 
