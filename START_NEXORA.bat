@@ -56,7 +56,9 @@ if errorlevel 1 goto install_retry
 echo.
 echo [START] Launching NEXORA...
 cd /d "%~dp0backend"
-start "" powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 40;$i++){try{$r=Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health -TimeoutSec 1;if($r.StatusCode -eq 200){Start-Process http://127.0.0.1:8000;break}}catch{Start-Sleep -Seconds 1}}"
+if not defined NEXORA_NO_BROWSER (
+  start "" powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 40;$i++){try{$r=Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health -TimeoutSec 1;if($r.StatusCode -eq 200){Start-Process http://127.0.0.1:8000;break}}catch{Start-Sleep -Seconds 1}}"
+)
 "%VPY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 if errorlevel 1 (
   echo.
