@@ -42,7 +42,7 @@ def test_chart_analysis_panel_and_engine_are_served():
     assert "calculateAnalysis" in script
     assert "Bullish FVG" in script
     assert "Bearish CHoCH" in script
-    assert "analysis.fvgs" in script
+    assert "a.fvgs" in script
     assert ".analysis-grid" in styles
 
 
