@@ -40,7 +40,7 @@ def _root_dir() -> Path:
 def _release_payload(force: bool = False) -> dict[str, Any]:
     now = time.monotonic()
     cached = _CACHE.get("payload")
-    if cached and not force and now - float(_CACHE["checked_at"]) < 45:
+    if cached and not force and now - float(_CACHE["checked_at"]) < 20:
         return dict(cached)
     try:
         response = httpx.get(
