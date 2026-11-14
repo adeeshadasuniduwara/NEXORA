@@ -143,6 +143,55 @@ async function startLive(){
   connectSocket(state.socketGeneration);
  }catch(error){$("feedState").textContent="Unavailable";$("engineLabel").textContent="Could not start Binance stream";health("wsHealth","Unavailable",false)}
 }
+
+let updatePollBusy=false,updateInstallStarted=false;
+function showUpdateToast(title,message,timeText=""){
+ const toast=$("updateToast");if(!toast)return;
+ $("updateToastTitle").textContent=title;$("updateToastMessage").textContent=message;$("updateToastTime").textContent=timeText;
+ toast.classList.remove("hidden");
+}
+async function watchForUpdatedServer(){
+ let sawOffline=false;
+ for(let attempt=0;attempt<40;attempt++){
+  await new Promise(resolve=>setTimeout(resolve,1000));
+  try{
+   const response=await fetch("/health",{cache:"no-store"});
+   if(!response.ok)sawOffline=true;
+   else if(sawOffline||attempt>=12){location.reload();return}
+  }catch(error){sawOffline=true}
+ }
+ showUpdateToast("Update restart is taking longer","NEXORA is still trying to restart. Please refresh the page in a moment.");
+}
+async function checkForNexoraUpdate(){
+ if(updatePollBusy||updateInstallStarted)return;
+ updatePollBusy=true;
+ try{
+  const status=await api("/api/v1/system/update");
+  if(status.last_update){
+   const last=status.last_update,key="nexora-update-seen-"+last.version;
+   let seen=false;try{seen=localStorage.getItem(key)==="1"}catch(error){}
+   if(!seen){
+    const updatedAt=last.updated_at?new Date(last.updated_at).toLocaleString():"just now";
+    const notes=(last.release_notes||"New improvements and fixes are now installed.").trim().slice(0,700);
+    showUpdateToast("NEXORA updated to v"+last.version,notes,"Updated at "+updatedAt);
+    try{localStorage.setItem(key,"1")}catch(error){}
+   }
+  }
+  if(status.status==="available"&&status.downloadable){
+   updateInstallStarted=true;
+   showUpdateToast("New NEXORA update found","Version "+status.latest_version+" is downloading. The workspace will restart automatically.");
+   const result=await api("/api/v1/system/update/apply",{method:"POST"});
+   if(result.started)watchForUpdatedServer();
+   else{updateInstallStarted=false;showUpdateToast("Update not started",result.message||"The latest update could not be installed automatically.")}
+  }
+ }catch(error){
+  const detail=String(error&&error.message||error);
+  if(detail.includes("Local Git changes")||detail.includes("409")){
+   showUpdateToast("NEXORA update waiting","Local project changes were detected. They have been protected; close local edits before updating.");
+  }
+ }finally{updatePollBusy=false}
+}
+
 function init(){
  $("searchPairBtn").addEventListener("click",searchPair);$("pairSearch").addEventListener("keydown",event=>{if(event.key==="Enter")searchPair()});
  $("pairSearch").addEventListener("input",()=>$("pairSearch").setCustomValidity(""));
@@ -151,6 +200,8 @@ function init(){
   $("chartTitle").innerHTML=state.symbol+" <span>·</span> "+state.interval.toUpperCase();loadCandles().then(startLive);
  }));
  $("refreshBtn").addEventListener("click",()=>{loadSymbols().then(()=>{loadCandles();startLive()})});
+ $("updateToastClose")?.addEventListener("click",()=>$("updateToast").classList.add("hidden"));
+ checkForNexoraUpdate();setInterval(checkForNexoraUpdate,60000);
  window.addEventListener("resize",()=>{clearTimeout(state.resizeTimer);state.resizeTimer=setTimeout(drawChart,100)});
  api("/health").then(()=>{health("localHealth","Online",true);$("engineLabel").textContent="Local engine online"}).catch(()=>health("localHealth","Offline",false));
  loadSymbols().then(()=>{if(!state.symbols.length)return;$("pairSearch").value=state.symbol;selectSymbol(state.symbol)});
