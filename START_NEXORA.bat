@@ -8,7 +8,7 @@ echo  NEXORA - SMART MARKET WORKSPACE
 echo  --------------------------------
 echo.
 
-rem Updates are now checked and installed by the in-app GitHub Releases updater.
+rem Updates are installed by the helper; this same launcher CMD restarts Uvicorn.
 set "PYTHON="
 where py >nul 2>nul
 if not errorlevel 1 (
@@ -53,37 +53,56 @@ if errorlevel 1 goto install_retry
 "%VPY%" -m pip check
 if errorlevel 1 goto install_retry
 
+rem Open one browser tab only. Server restarts below do not spawn more windows.
+start "" powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 40;$i++){try{$r=Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health -TimeoutSec 1;if($r.StatusCode -eq 200){Start-Process http://127.0.0.1:8000;break}}catch{Start-Sleep -Seconds 1}}"
+
+:run_server
 echo.
-echo [START] Launching NEXORA...
+echo [START] Launching NEXORA in this window...
 cd /d "%~dp0backend"
-if not defined NEXORA_NO_BROWSER (
-  start "" powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 40;$i++){try{$r=Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health -TimeoutSec 1;if($r.StatusCode -eq 200){Start-Process http://127.0.0.1:8000;break}}catch{Start-Sleep -Seconds 1}}"
-)
 "%VPY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+cd /d "%~dp0"
+
+rem A verified update creates this marker before stopping Uvicorn.
+if exist ".nexora_update_pending" goto wait_for_update
 if errorlevel 1 (
   echo.
   echo [ERROR] NEXORA stopped unexpectedly.
   pause
+  exit /b 1
 )
+echo.
+echo [INFO] NEXORA server stopped.
+pause
 exit /b 0
+
+:wait_for_update
+echo.
+echo [UPDATE] Applying update. This same CMD window will restart NEXORA...
+set "UPDATE_WAIT=0"
+:wait_update_loop
+if not exist ".nexora_update_pending" goto run_server
+set /a UPDATE_WAIT+=1
+if %UPDATE_WAIT% GEQ 180 goto update_timeout
+timeout /t 1 /nobreak >nul
+goto wait_update_loop
+
+:update_timeout
+echo.
+echo [ERROR] Update helper did not finish within 180 seconds.
+echo Please check .nexora_update_state.json and restart NEXORA manually.
+pause
+exit /b 1
 
 :install_retry
 echo [REPAIR] Dependency installation failed. Clearing pip cache and retrying...
 "%VPY%" -m pip cache purge
 "%VPY%" -m pip install --disable-pip-version-check --no-cache-dir --retries 8 --timeout 60 -r "%~dp0backend\requirements.txt"
-if not errorlevel 1 goto launch_retry
+if not errorlevel 1 goto run_server
 echo [ERROR] Automatic dependency repair could not complete.
 echo Check your internet connection, antivirus, disk space and Python installation.
 pause
 exit /b 1
-
-:launch_retry
-cd /d "%~dp0backend"
-echo [START] Launching after dependency repair...
-start "" powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 40;$i++){try{$r=Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health -TimeoutSec 1;if($r.StatusCode -eq 200){Start-Process http://127.0.0.1:8000;break}}catch{Start-Sleep -Seconds 1}}"
-"%VPY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-pause
-exit /b 0
 
 :repair_venv
 echo [REPAIR] Rebuilding the isolated Python environment...
