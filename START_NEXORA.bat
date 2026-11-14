@@ -8,22 +8,7 @@ echo  NEXORA - SMART MARKET WORKSPACE
 echo  --------------------------------
 echo.
 
-where git >nul 2>nul
-if not errorlevel 1 (
-  git rev-parse --is-inside-work-tree >nul 2>nul
-  if not errorlevel 1 (
-    for /f %%i in ('git status --porcelain') do set DIRTY=1
-    if not defined DIRTY (
-      echo [UPDATE] Checking GitHub for updates...
-      git fetch origin main
-      if not errorlevel 1 git pull --ff-only origin main
-      if errorlevel 1 echo [WARN] Update skipped. Existing local files were preserved.
-    ) else (
-      echo [WARN] Local changes detected. Automatic update skipped to protect your work.
-    )
-  )
-)
-
+rem Updates are now checked and installed by the in-app GitHub Releases updater.
 set "PYTHON="
 where py >nul 2>nul
 if not errorlevel 1 (
