@@ -10,8 +10,8 @@ from app.routes.market import router as market_router
 
 app = FastAPI(
     title="NEXORA",
-    version="0.4.0",
-    description="Chart-first crypto market analysis workspace powered by Binance public market data.",
+    version="0.5.0",
+    description="Live Binance Spot market terminal with all-market ticker discovery, selected-pair depth, and chart analysis.",
 )
 
 app.include_router(market_router, prefix="/api/v1")
