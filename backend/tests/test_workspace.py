@@ -72,3 +72,41 @@ def test_chart_workspace_has_single_trade_desk_and_strategy_packs():
     assert "liquidity sweep" in script.lower()
     assert ".trade-layout" in styles
     assert ".indicator-toolbar" in styles
+
+
+def test_live_chart_uses_trade_ticks_and_keeps_historical_window():
+    client = TestClient(app)
+    script = client.get("/assets/app.js").text
+
+    assert "function updateTrade(trade)" in script
+    assert "scheduleMarketPaint()" in script
+    assert "last.high=Math.max(Number(last.high),price)" in script
+    assert "state.candles.length>5000" in script
+    assert "function schedulePressureRender()" in script
+
+
+def test_pair_picker_supports_full_scroll_list_and_live_suggestions():
+    client = TestClient(app)
+    page = client.get("/assets/index.html").text
+    script = client.get("/assets/app.js").text
+    styles = client.get("/assets/styles.css").text
+
+    assert 'id="pairSuggestions"' in page
+    assert 'id="pairSuggestionCount"' in page
+    assert "function renderPairSuggestions" in script
+    assert "item.symbol.includes(q)" in script
+    assert "state.symbols.forEach" not in script
+    assert ".pair-suggestions" in styles
+    assert "overflow:auto" in styles
+
+
+def test_smc_pack_includes_inducement_and_extended_core_concepts():
+    client = TestClient(app)
+    page = client.get("/assets/index.html").text
+    script = client.get("/assets/app.js").text
+
+    for concept in ("idm", "ifvg", "breakers", "mitigation", "rejection", "displacement", "liquidityVoid", "premiumDiscount"):
+        assert f'data-confirm="{concept}"' in page
+    for concept in ("Inducement (IDM)", "Bullish IFVG", "Breaker Block", "Mitigation Block candidate", "Liquidity Void", "Bullish Displacement"):
+        assert concept in script
+    assert 'id="analysisPanel"' in page

@@ -111,3 +111,17 @@ footer{margin-top:22px;padding:13px 2px;border-top:1px solid #1e2a3c;font:8px 'D
 .confirmation-title{margin:15px 0 9px}.confirmation-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 12px}
 @media(max-width:900px){.trade-layout{grid-template-columns:1fr}}
 @media(max-width:520px){.chart-tool-row{align-items:flex-start}.draw-tools,.chart-actions{width:100%}.draw-tools button,.chart-actions button{flex:1;padding:8px 5px;font-size:7px}.indicator-toolbar{gap:9px}.indicator-toolbar label{font-size:8px}.trade-layout{gap:9px}.desk-levels{grid-template-columns:repeat(3,minmax(0,1fr))}.desk-levels b{font-size:10px}.pack-grid{gap:6px}.pack-card{padding:10px}.confirmation-options{gap:9px 6px}.confirmation-options label{font-size:8px}}
+
+.search-controls{position:relative;min-width:min(600px,100%)}
+.pair-search-wrap{position:relative;flex:1;min-width:220px}
+.pair-search-wrap input{width:100%}
+.pair-suggestions{position:absolute;z-index:50;top:calc(100% + 8px);left:0;right:0;max-height:360px;overflow:auto;overscroll-behavior:contain;background:#0b1421;border:1px solid #35516a;border-radius:10px;box-shadow:0 18px 48px #0009;padding:6px}
+.pair-suggestion-head{position:sticky;top:-6px;z-index:2;display:flex;justify-content:space-between;gap:10px;padding:9px 10px;background:#0b1421;border-bottom:1px solid #26364a;color:#8ea1b8;font:8px 'DM Mono';letter-spacing:1px}
+.pair-suggestion-head b{color:#70e5bd;font-weight:500}
+.pair-option{display:flex;width:100%;justify-content:space-between;align-items:center;gap:12px;padding:9px 10px;border:0;border-radius:6px;background:transparent;color:#dce8f5;text-align:left;cursor:pointer}
+.pair-option:hover,.pair-option:focus-visible{background:#17352f;outline:none}
+.pair-option b{font:600 10px 'DM Mono';letter-spacing:.3px}
+.pair-option span{font:9px 'DM Mono';color:#7f91a8}
+.analysis-lower{grid-template-columns:1fr 1fr}
+.analysis-list{max-height:290px;overflow:auto}
+@media(max-width:650px){.search-controls{min-width:0;width:100%}.pair-search-wrap{min-width:0}.pair-suggestions{max-height:55vh}.analysis-lower{grid-template-columns:1fr}}

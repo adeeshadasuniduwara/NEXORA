@@ -38,3 +38,28 @@ ICT, Alchemist and Order Flow packs are placeholders marked IN DEVELOPMENT. They
 - The initial position stop is an ATR-based draft, not personalized risk sizing.
 - This release is an analysis and planning tool only. It does not place orders, manage positions or promise trading performance.
 - Historical depth is bounded by Binance API availability and symbol listing history.
+
+
+## Live market rendering and full pair selector (v1.1.0)
+
+The selected Binance Spot symbol receives trade, kline, book-ticker and partial depth streams. Individual trade events now update the active candle's live high, low and close immediately; chart painting is coalesced to the browser animation frame to avoid a redraw for every incoming message. SMC calculations are throttled separately, while the displayed last price follows each trade. Order-book DOM updates are coalesced to the animation frame so fast depth events do not cause redundant layouts. When the user has panned into history, new market events continue arriving but do not force the viewport back to the latest candle.
+
+The pair selector loads the full list of Binance Spot symbols with status TRADING and Spot trading enabled, sorted alphabetically. Focusing the empty search opens the scrollable full list; typing filters symbols, base assets and quote assets immediately. Results are selected directly from the list.
+
+## Expanded SMC analysis pack
+
+The deterministic SMC engine now identifies and displays:
+- External swing structure with HH, HL, LH and LL labels
+- BOS and CHoCH events, with event direction sequenced from prior breaks
+- Internal swing liquidity sweeps and candidate Inducement (IDM) levels preceding a subsequent structure break
+- Equal highs and equal lows
+- Bullish and bearish three-candle FVGs and inverted FVG candidates
+- Order-block candidates derived from the last opposing candle before a structure break
+- Breaker-block candidates after an order block is invalidated
+- Mitigation-block candidates on later zone retests
+- Premium / Discount dealing range and Equilibrium (EQ)
+- Displacement candles, liquidity void candidates and rejection-block candidates
+
+Definitions and confirmation rules vary between SMC methodologies. These deterministic detections are educational candidates, not authoritative labels; the trader should inspect the underlying candles and context. The IDM label is only shown when an internal pivot sweep occurs before a later BOS/CHoCH in the analyzed history. ICT and Alchemist remain separate future packs.
+
+Live rendering is market-data driven, but actual observed latency still depends on Binance's stream delivery, network connection, browser scheduling and device performance. No application can guarantee identical latency to the exchange matching engine.

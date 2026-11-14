@@ -16,7 +16,7 @@
 <section class="welcome-row"><div><div class="eyebrow">MARKET TERMINAL / REAL-TIME</div><h1>Read the market <em>as it moves.</em></h1><p>Live Binance prices, order book depth and every tradable Spot pair in one workspace.</p></div><div class="engine-state"><i class="pulse"></i><span id="engineLabel">Connecting to Binance</span></div></section>
 <section class="pair-search panel">
   <div class="search-copy"><div class="panel-kicker">MARKET SELECTOR</div><h3>Find any Binance pair</h3></div>
-  <div class="search-controls"><input id="pairSearch" list="pairOptions" autocomplete="off" placeholder="Search Pair — e.g. BTCUSDT"><datalist id="pairOptions"></datalist><button id="searchPairBtn" class="primary-btn">Search Pair <span>⌕</span></button></div>
+  <div class="search-controls"><div class="pair-search-wrap"><input id="pairSearch" autocomplete="off" spellcheck="false" placeholder="Type any coin or pair — e.g. BTCUSDT" aria-label="Search Binance trading pairs"><div id="pairSuggestions" class="pair-suggestions hidden" role="listbox"><div class="pair-suggestion-head"><span>AVAILABLE BINANCE PAIRS</span><b id="pairSuggestionCount">0 pairs</b></div></div></div><button id="searchPairBtn" class="primary-btn">Search Pair <span>⌕</span></button></div>
   <div class="pair-count"><b id="pairCount">—</b><span>tradable pairs discovered</span></div>
 </section>
 <section class="stats-grid">
@@ -76,10 +76,18 @@
   <div class="confirmation-title">SMC CONFIRMATIONS</div>
   <div class="confirmation-options">
    <label><input type="checkbox" data-confirm="structure" checked> BOS / CHoCH</label>
+   <label><input type="checkbox" data-confirm="idm" checked> Inducement / IDM</label>
    <label><input type="checkbox" data-confirm="fvg" checked> FVG</label>
+   <label><input type="checkbox" data-confirm="ifvg" checked> Inversion FVG</label>
    <label><input type="checkbox" data-confirm="ob" checked> Order Blocks</label>
-   <label><input type="checkbox" data-confirm="liquidity" checked> Liquidity Sweep</label>
+   <label><input type="checkbox" data-confirm="breakers" checked> Breaker Blocks</label>
+   <label><input type="checkbox" data-confirm="mitigation" checked> Mitigation Blocks</label>
+   <label><input type="checkbox" data-confirm="rejection" checked> Rejection Blocks</label>
+   <label><input type="checkbox" data-confirm="displacement" checked> Displacement</label>
+   <label><input type="checkbox" data-confirm="liquidity" checked> Liquidity Sweeps</label>
+   <label><input type="checkbox" data-confirm="liquidityVoid" checked> Liquidity Voids</label>
    <label><input type="checkbox" data-confirm="eq" checked> EQH / EQL</label>
+   <label><input type="checkbox" data-confirm="premiumDiscount" checked> Premium / Discount</label>
    <label><input type="checkbox" data-confirm="ema" checked> EMA confirmation</label>
    <label><input type="checkbox" data-confirm="rsi" checked> RSI confirmation</label>
    <label><input type="checkbox" data-confirm="volume"> Volume confirmation</label>
@@ -97,7 +105,7 @@
  </div>
  <div class="analysis-lower">
   <div><div class="analysis-subhead">LATEST STRUCTURE EVENTS</div><div id="structureEvents" class="analysis-list"><span>Waiting for confirmed swings…</span></div></div>
-  <div><div class="analysis-subhead">FAIR VALUE GAPS</div><div id="fvgEvents" class="analysis-list"><span>Scanning candle imbalances…</span></div></div>
+  <div><div class="analysis-subhead">SMC IMBALANCES & BLOCKS</div><div id="fvgEvents" class="analysis-list"><span>Scanning candle imbalances…</span></div></div>
  </div>
  <p class="analysis-disclaimer">Educational market analysis only. Conditions are calculated from available Binance Spot candles; this is not a guaranteed prediction or trade instruction.</p>
 </section>
