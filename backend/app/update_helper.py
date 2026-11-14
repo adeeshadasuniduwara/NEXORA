@@ -111,12 +111,10 @@ def main() -> int:
     parser.add_argument("--root", required=True)
     parser.add_argument("--archive", required=True)
     parser.add_argument("--parent-pid", required=True, type=int)
-    parser.add_argument("--version", required=True)
-    parser.add_argument("--tag", required=True)
-    parser.add_argument("--published-at", default="")
-    parser.add_argument("--notes", default="")
+    parser.add_argument("--manifest", required=True)
     args = parser.parse_args()
     root, archive = Path(args.root).resolve(), Path(args.archive).resolve()
+    manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
     wait_for_process(args.parent_pid)
 
     failure = None
@@ -135,11 +133,11 @@ def main() -> int:
 
     state = {
         "status": "failed" if failure else "installed",
-        "version": args.version,
-        "tag": args.tag,
-        "published_at": args.published_at,
+        "version": manifest["version"],
+        "tag": manifest["tag"],
+        "published_at": manifest.get("published_at", ""),
         "updated_at": datetime.now(timezone.utc).isoformat(),
-        "release_notes": args.notes,
+        "release_notes": manifest.get("release_notes", ""),
         "error": failure,
     }
     (root / ".nexora_update_state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
