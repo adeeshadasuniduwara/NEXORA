@@ -152,12 +152,12 @@ function showUpdateToast(title,message,timeText=""){
 }
 async function watchForUpdatedServer(){
  let sawOffline=false;
- for(let attempt=0;attempt<40;attempt++){
+ for(let attempt=0;attempt<180;attempt++){
   await new Promise(resolve=>setTimeout(resolve,1000));
   try{
    const response=await fetch("/health",{cache:"no-store"});
    if(!response.ok)sawOffline=true;
-   else if(sawOffline||attempt>=12){location.reload();return}
+   else if(sawOffline||attempt>=20){location.reload();return}
   }catch(error){sawOffline=true}
  }
  showUpdateToast("Update restart is taking longer","NEXORA is still trying to restart. Please refresh the page in a moment.");
