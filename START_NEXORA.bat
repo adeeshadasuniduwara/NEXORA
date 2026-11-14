@@ -32,9 +32,7 @@ if not errorlevel 1 (
 )
 if not defined PYTHON (
   where python >nul 2>nul
-  if not errorlevel 1 (
-    python --version >nul 2>nul && set "PYTHON=python"
-  )
+  if not errorlevel 1 python --version >nul 2>nul && set "PYTHON=python"
 )
 if not defined PYTHON (
   echo [ERROR] Python 3.10 or newer was not found.
@@ -42,19 +40,16 @@ if not defined PYTHON (
   pause
   exit /b 1
 )
-
 if not exist "backend\requirements.txt" (
   echo [ERROR] backend\requirements.txt is missing. Please reinstall NEXORA.
   pause
   exit /b 1
 )
-
 if not exist "backend\.venv\Scripts\python.exe" (
   echo [SETUP] Creating isolated Python environment...
   %PYTHON% -m venv "backend\.venv"
   if errorlevel 1 goto repair_venv
 )
-
 set "VPY=%~dp0backend\.venv\Scripts\python.exe"
 echo [SETUP] Checking pip...
 "%VPY%" -m ensurepip --upgrade
@@ -70,11 +65,11 @@ if errorlevel 1 goto install_retry
 echo.
 echo [START] Launching NEXORA...
 cd /d "%~dp0backend"
-start "" http://127.0.0.1:8000
+start "" powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 40;$i++){try{$r=Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health -TimeoutSec 1;if($r.StatusCode -eq 200){Start-Process http://127.0.0.1:8000;break}}catch{Start-Sleep -Seconds 1}}"
 "%VPY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 if errorlevel 1 (
   echo.
-  echo [ERROR] NEXORA stopped unexpectedly. See backend\logs if available.
+  echo [ERROR] NEXORA stopped unexpectedly.
   pause
 )
 exit /b 0
@@ -92,7 +87,7 @@ exit /b 1
 :launch_retry
 cd /d "%~dp0backend"
 echo [START] Launching after dependency repair...
-start "" http://127.0.0.1:8000
+start "" powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 40;$i++){try{$r=Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health -TimeoutSec 1;if($r.StatusCode -eq 200){Start-Process http://127.0.0.1:8000;break}}catch{Start-Sleep -Seconds 1}}"
 "%VPY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 pause
 exit /b 0
