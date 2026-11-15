@@ -34,7 +34,7 @@ function calculateAnalysis(){
  const lastTwo=(arr)=>arr.slice(-2),h2=lastTwo(majorHighs),l2=lastTwo(majorLows);
  let structure="RANGING",structureDetail="Waiting for confirmed external swing sequence",bias="NEUTRAL";
  if(h2.length===2&&l2.length===2){const hh=h2[1].price>h2[0].price,hl=l2[1].price>l2[0].price,lh=h2[1].price<h2[0].price,ll=l2[1].price<l2[0].price;if(hh&&hl){structure="BULLISH STRUCTURE";bias="BULLISH"}else if(lh&&ll){structure="BEARISH STRUCTURE";bias="BEARISH"}structureDetail=(hh?"HH":lh?"LH":"Unconfirmed high")+" · "+(hl?"HL":ll?"LL":"Unconfirmed low")}
- const events=[],breaks=[];let workingBias="NEUTRAL";
+ const events=[],breaks=[];let workingBias=bias;
  const seenHigh=new Set(),seenLow=new Set();
  for(let i=Math.max(1,n-180);i<n;i++){
   const priorHigh=[...majorHighs].reverse().find(p=>p.index<i-4),priorLow=[...majorLows].reverse().find(p=>p.index<i-4);
@@ -47,7 +47,18 @@ function calculateAnalysis(){
  for(const p of internal.highs.slice(-35)){const hit=candles.slice(p.index+1).findIndex((c,j)=>p.index+1+j<n&&highs[p.index+1+j]>p.price&&closes[p.index+1+j]<p.price);if(hit>=0){const i=p.index+1+hit;sweeps.push({type:"Buy-side liquidity sweep",price:p.price,index:i,bearish:true})}}
  for(const p of internal.lows.slice(-35)){const hit=candles.slice(p.index+1).findIndex((c,j)=>p.index+1+j<n&&lows[p.index+1+j]<p.price&&closes[p.index+1+j]>p.price);if(hit>=0){const i=p.index+1+hit;sweeps.push({type:"Sell-side liquidity sweep",price:p.price,index:i,bearish:false})}}
  const inducements=[];
- for(const br of breaks.slice(-12)){const candidates=br.bearish?internal.highs:internal.lows;const start=Math.max(0,br.index-24);const candidate=candidates.filter(p=>p.index>=start&&p.index<br.index).reverse().find(p=>sweeps.some(sw=>sw.index>p.index&&sw.index<br.index&&Math.abs(sw.price-p.price)<=Math.max(last*.0005,1e-12)));if(candidate){const sw=sweeps.filter(x=>x.index>candidate.index&&x.index<br.index).at(-1);if(sw)inducements.push({type:"Inducement (IDM)",price:candidate.price,index:sw.index,bearish:br.bearish,breakIndex:br.index,confirmedBy:br.name})}}
+ // IDM is only confirmed when an internal swing on the opposing side is swept
+ // after it forms and before a later displacement/structure break closes through.
+ for(const br of breaks.slice(-20)){
+  const candidates=br.bearish?internal.highs:internal.lows;
+  const protectedSwing=br.bearish?majorHighs.filter(p=>p.index<br.index).at(-1):majorLows.filter(p=>p.index<br.index).at(-1);
+  const floorIndex=protectedSwing?protectedSwing.index:Math.max(0,br.index-40);
+  const expectedSweep=br.bearish?"Buy-side liquidity sweep":"Sell-side liquidity sweep";
+  const candidate=candidates.filter(p=>p.index>floorIndex&&p.index<br.index).reverse().find(p=>sweeps.some(sw=>sw.type===expectedSweep&&sw.index>p.index&&sw.index<br.index&&Math.abs(sw.price-p.price)<=Math.max(Math.abs(p.price)*0.00015,1e-12)));
+  if(!candidate)continue;
+  const sweep=sweeps.filter(sw=>sw.type===expectedSweep&&sw.index>candidate.index&&sw.index<br.index&&Math.abs(sw.price-candidate.price)<=Math.max(Math.abs(candidate.price)*0.00015,1e-12)).at(-1);
+  if(sweep)inducements.push({type:"Inducement (IDM)",price:candidate.price,index:candidate.index,sweepIndex:sweep.index,bearish:br.bearish,breakIndex:br.index,confirmedBy:br.name,confirmation:"internal swing swept before structure break"});
+ }
  const fvgs=[];
  for(let i=Math.max(2,n-160);i<n;i++){if(lows[i]>highs[i-2])fvgs.push({type:"Bullish FVG",low:highs[i-2],high:lows[i],index:i,bearish:false});else if(highs[i]<lows[i-2])fvgs.push({type:"Bearish FVG",low:highs[i],high:lows[i-2],index:i,bearish:true})}
  const ifvgs=[];for(const z of fvgs){const later=closes.slice(z.index+1).findIndex(c=>z.bearish?c>z.high:c<z.low);if(later>=0){const index=z.index+1+later;if(index<n-1)ifvgs.push({type:z.bearish?"Bullish IFVG":"Bearish IFVG",low:z.low,high:z.high,index,bearish:!z.bearish})}}
