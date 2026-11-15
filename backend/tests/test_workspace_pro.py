@@ -37,6 +37,6 @@ def test_pine_subset_is_explicitly_limited_and_safe():
     assert "if(event.button!==0)return" in app_script
     assert "state.priceScale={min:center-next/2,max:center+next/2}" in app_script
     assert "canvas.addEventListener(\"dblclick\"" in app_script
-    assert "state.position.source===\"SMC AUTO SIGNAL\"&&position.symbol===state.symbol" in app_script
+    assert 'position&&position.source==="SMC AUTO SIGNAL"&&position.symbol===state.symbol' in app_script
     assert "state.dragging.level" not in app_script
     assert "drawPosition(ctx,position,y,pad,width)" in app_script
