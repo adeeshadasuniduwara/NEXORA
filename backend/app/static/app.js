@@ -411,7 +411,8 @@ function bindChartTools(){
    if(!state.position){createPosition(state.drawTool==="long"?"LONG":"SHORT",priceAt(event.clientY));state.drawTool="cursor";$("positionLongBtn").classList.remove("tool-active");$("positionShortBtn").classList.remove("tool-active")}
    return;
   }
-  if(state.drawTool==="horizontal"){state.drawings.push({type:"horizontal",price:priceAt(event.clientY),label:"Manual level"});saveWorkspaceMarks();drawChart();return}\n  if(state.drawTool==="vertical"){state.drawings.push({type:"vertical",index:chartIndexAt(event.clientX),label:"Time marker"});saveWorkspaceMarks();drawChart();return}
+  if(state.drawTool==="horizontal"){state.drawings.push({type:"horizontal",price:priceAt(event.clientY),label:"Manual level"});saveWorkspaceMarks();drawChart();return}
+  if(state.drawTool==="vertical"){state.drawings.push({type:"vertical",index:chartIndexAt(event.clientX),label:"Time marker"});saveWorkspaceMarks();drawChart();return}
   if(state.drawTool==="text"){const note=window.prompt("Chart note:");if(note){state.drawings.push({type:"text",index:chartIndexAt(event.clientX),price:priceAt(event.clientY),text:note.slice(0,80)});saveWorkspaceMarks();drawChart()}return}
   if(state.drawTool==="trendline"||state.drawTool==="rectangle"||state.drawTool==="fib"||state.drawTool==="ray"){
    const point={index:chartIndexAt(event.clientX),price:priceAt(event.clientY)};
