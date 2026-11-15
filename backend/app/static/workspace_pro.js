@@ -25,7 +25,15 @@ function ensureUi(){
  const canvas=$("candleChart");
  if(canvas){canvas.addEventListener("contextmenu",openContextMenu);canvas.addEventListener("pointermove",drawCrosshair);canvas.addEventListener("pointerleave",()=>{if(overlay){const c=overlay.getContext("2d");c.clearRect(0,0,overlay.width,overlay.height);renderScriptOverlay()}})}
  document.addEventListener("pointerdown",e=>{if(menu&&!menu.contains(e.target))menu.classList.add("hidden")});
- document.addEventListener("keydown",e=>{if(e.key==="Escape"){menu?.classList.add("hidden");modal?.classList.add("hidden")}if(e.altKey&&e.key.toLowerCase()==="r"){e.preventDefault();resetView()}});
+ document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){menu?.classList.add("hidden");modal?.classList.add("hidden")}
+  if(e.altKey&&e.key.toLowerCase()==="r"){e.preventDefault();resetView();return}
+  const editing=e.target?.closest?.("input,textarea,select,[contenteditable='true']");
+  if(editing)return;
+  if(e.altKey&&e.key.toLowerCase()==="a"){e.preventDefault();const price=Number(state.candles.at(-1)?.close);if(price)showAlertDialog(price);return}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="c"&&state.drawings.length){e.preventDefault();try{sessionStorage.setItem("nexora-drawing-clipboard",JSON.stringify(state.drawings.at(-1)))}catch(err){}return}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="v"){e.preventDefault();try{const d=JSON.parse(sessionStorage.getItem("nexora-drawing-clipboard")||"null");if(d){state.drawings.push(JSON.parse(JSON.stringify(d)));saveWorkspaceMarks();drawChart()}}catch(err){}}
+ });
 }
 function openModal(title,body,actions=[]){
  modal.replaceChildren();const card=el("section",{class:"nx-modal-card"}),head=el("header",{class:"nx-modal-head"});head.append(el("h3",{},title));const close=el("button",{class:"nx-close",type:"button"},"×");close.onclick=()=>modal.classList.add("hidden");head.append(close);card.append(head);
@@ -81,7 +89,7 @@ function openContextMenu(event){
  const items=[
  ["↶","Reset chart view","Alt + R",resetView],
  ["▣","Copy price "+Number(price).toPrecision(10),"",()=>copyPrice(price)],
- ["⧉","Copy latest drawing","",()=>{const d=state.drawings.at(-1);if(d){try{sessionStorage.setItem("nexora-drawing-clipboard",JSON.stringify(d))}catch(e){}}menu.classList.add("hidden")}],
+ ["⧉","Copy latest drawing","Ctrl + C",()=>{const d=state.drawings.at(-1);if(d){try{sessionStorage.setItem("nexora-drawing-clipboard",JSON.stringify(d))}catch(e){}}menu.classList.add("hidden")}],
  ["＋","Paste drawing","Ctrl + V",()=>{try{const d=JSON.parse(sessionStorage.getItem("nexora-drawing-clipboard")||"null");if(d){state.drawings.push(JSON.parse(JSON.stringify(d)));saveWorkspaceMarks();drawChart()}}catch(e){}menu.classList.add("hidden")}],
  ["◷","Add alert at "+Number(price).toPrecision(9),"Alt + A",()=>{menu.classList.add("hidden");showAlertDialog(price)}],
  ["│","Lock vertical cursor line by time","",()=>{lockedTime=state.candles[chartIndexAt(event.clientX)]?.open_time??null;menu.classList.add("hidden")}],
