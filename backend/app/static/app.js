@@ -406,6 +406,7 @@ function bindChartTools(){
  $("clearDrawingsBtn").addEventListener("click",()=>{state.drawings=[];state.draft=null;saveWorkspaceMarks();drawChart()});
  $("liveChartBtn").addEventListener("click",()=>{state.view.follow=true;state.view.end=state.candles.length;$("liveChartBtn").classList.add("tool-active");drawChart()});
  canvas.addEventListener("pointerdown",event=>{
+  if(event.button!==0)return; // Right-click is reserved for the context menu; never begin a pan drag.
   const rect=canvas.getBoundingClientRect(),px=event.clientX-rect.left,py=event.clientY-rect.top;
   if(state.drawTool==="long"||state.drawTool==="short"){
    if(!state.position){createPosition(state.drawTool==="long"?"LONG":"SHORT",priceAt(event.clientY));state.drawTool="cursor";$("positionLongBtn").classList.remove("tool-active");$("positionShortBtn").classList.remove("tool-active")}
