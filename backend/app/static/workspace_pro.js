@@ -3,12 +3,13 @@
 "use strict";
 const $=id=>document.getElementById(id);
 const key="nexora-pro-settings";
-const defaults={autoSignal:true,showCrosshair:true,showScriptPlots:true,visibleCandles:120,alertSound:false};
+const defaults={autoSignal:true,showCrosshair:true,showScriptPlots:true,visibleCandles:120,alertSound:false,upColor:"#70e5bd",downColor:"#f17e8c",backgroundColor:"#0c1522",showGrid:true};
 let prefs={...defaults};
 try{prefs={...prefs,...JSON.parse(localStorage.getItem(key)||"{}")}}catch(e){}
 let menu=null,modal=null,overlay=null,scriptSeries=[],scriptLines=[],lockedTime=null,lastSignalKey="",alerts=[];
 try{alerts=JSON.parse(localStorage.getItem("nexora-price-alerts")||"[]")}catch(e){}
 function savePrefs(){try{localStorage.setItem(key,JSON.stringify(prefs))}catch(e){}}
+function applyChartPrefs(){window.NEXORA_CHART_UP=prefs.upColor;window.NEXORA_CHART_DOWN=prefs.downColor;window.NEXORA_SHOW_GRID=prefs.showGrid;const canvas=$("candleChart");if(canvas)canvas.style.backgroundColor=prefs.backgroundColor;drawChart()}
 function el(tag,attrs={},text=""){const n=document.createElement(tag);Object.entries(attrs).forEach(([k,v])=>{if(k==="class")n.className=v;else if(k==="style")n.style.cssText=v;else n.setAttribute(k,v)});if(text)n.textContent=text;return n}
 function ensureUi(){
  if($("nexoraProUi"))return;
@@ -43,6 +44,9 @@ function showSettings(){
  field("Show crosshair",checkbox(prefs.showCrosshair,v=>{prefs.showCrosshair=v;savePrefs();drawChart()}));
  const count=el("select");[60,90,120,150,200,300].forEach(n=>{const o=el("option",{value:String(n)},n+" candles");if(n===prefs.visibleCandles)o.selected=true;count.append(o)});count.onchange=()=>{prefs.visibleCandles=Number(count.value);state.view.visible=prefs.visibleCandles;drawChart();savePrefs()};field("Default visible candles",count);
  const alertSound=checkbox(prefs.alertSound,v=>{prefs.alertSound=v;savePrefs()});field("Alert sound (browser)",alertSound);
+ const color=(value,fn)=>{const i=el("input",{type:"color",value});i.oninput=()=>{fn(i.value);savePrefs();applyChartPrefs()};return i};
+ field("Bullish candle",color(prefs.upColor,v=>prefs.upColor=v));field("Bearish candle",color(prefs.downColor,v=>prefs.downColor=v));field("Chart background",color(prefs.backgroundColor,v=>prefs.backgroundColor=v));
+ field("Chart grid",checkbox(prefs.showGrid,v=>{prefs.showGrid=v;savePrefs();applyChartPrefs()}));
  const note=el("p",{class:"nx-note"},"Settings and chart objects are stored in this browser only. NEXORA does not send exchange orders.");body.append(note);
  openModal("Chart settings",body,[{label:"Reset chart view",onClick:resetView},{label:"Done",primary:true,onClick:()=>modal.classList.add("hidden")}]);
 }
@@ -61,11 +65,11 @@ function showObjects(){
  openModal("Object tree",body);
 }
 function saveTemplate(){
- const template={indicators:state.indicators,confirmations:state.confirmations,visible:state.view.visible,drawings:state.drawings};
+ const template={indicators:state.indicators,confirmations:state.confirmations,visible:state.view.visible,drawings:state.drawings,chartPrefs:prefs};
  try{localStorage.setItem("nexora-chart-template-default",JSON.stringify(template));menu.classList.add("hidden");openModal("Chart template saved",el("p",{class:"nx-note"},"Saved this chart layout, indicators, SMC visibility and drawings in this browser."))}catch(e){openModal("Template error",el("p",{},String(e)))}
 }
 function loadTemplate(){
- try{const t=JSON.parse(localStorage.getItem("nexora-chart-template-default")||"null");if(!t)throw Error("No saved template found.");state.indicators={...state.indicators,...t.indicators};state.confirmations={...state.confirmations,...t.confirmations};state.drawings=Array.isArray(t.drawings)?t.drawings:[];state.view.visible=Number(t.visible)||120;document.querySelectorAll("[data-indicator]").forEach(i=>i.checked=!!state.indicators[i.dataset.indicator]);document.querySelectorAll("[data-confirm]").forEach(i=>i.checked=!!state.confirmations[i.dataset.confirm]);saveWorkspaceMarks();drawChart();menu.classList.add("hidden")}catch(e){openModal("Chart template",el("p",{class:"nx-note"},e.message))}
+ try{const t=JSON.parse(localStorage.getItem("nexora-chart-template-default")||"null");if(!t)throw Error("No saved template found.");state.indicators={...state.indicators,...t.indicators};state.confirmations={...state.confirmations,...t.confirmations};state.drawings=Array.isArray(t.drawings)?t.drawings:[];state.view.visible=Number(t.visible)||120;if(t.chartPrefs){prefs={...prefs,...t.chartPrefs};savePrefs();applyChartPrefs()}document.querySelectorAll("[data-indicator]").forEach(i=>i.checked=!!state.indicators[i.dataset.indicator]);document.querySelectorAll("[data-confirm]").forEach(i=>i.checked=!!state.confirmations[i.dataset.confirm]);saveWorkspaceMarks();drawChart();menu.classList.add("hidden")}catch(e){openModal("Chart template",el("p",{class:"nx-note"},e.message))}
 }
 function addPriceAlert(price){
  const value=Number(price);if(!Number.isFinite(value)||value<=0)return false;
@@ -114,7 +118,7 @@ function compileScript(source){
  lines.forEach((line,index)=>{const s=line.trim();if(!s||s.startsWith("//")||s.startsWith("indicator(")||s.startsWith("study("))return;
  let m=s.match(/^plot\s*\(\s*(close|open|high|low)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
  if(m){plots.push({name:m[2]||m[1],values:a[m[1]]});return}
- m=s.match(/^plot\s*\(\s*ta\.(ema|sma)\s*\(\s*(close|open|high|low|volume)\s*,\s*(\d{1,3})\s*\)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
+ m=s.match(/^plot\s*\(\s*ta\.(ema|sma)\s*\(\s*(close|open|high|low)\s*,\s*(\d{1,3})\s*\)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
  if(m){const p=Number(m[3]);if(p<2||p>200){errors.push("Line "+(index+1)+": period must be 2–200");return}plots.push({name:m[4]||m[1].toUpperCase()+" "+p,values:m[1]==="ema"?ema(a[m[2]],p):sma(a[m[2]],p)});return}
  m=s.match(/^hline\s*\(\s*(-?\d+(?:\.\d+)?)\s*\)\s*$/);if(m){plots.push({name:"hline "+m[1],values:Array(a.close.length).fill(Number(m[1]))});return}
  errors.push("Line "+(index+1)+": unsupported syntax — use plot(close/open/high/low), plot(ta.ema/sma(source, period)) or hline(price).");
@@ -144,5 +148,5 @@ function autoSignal(){
 const baseCalc=calculateAnalysis;calculateAnalysis=function(){baseCalc();autoSignal()};
 const baseDesk=renderTradeDesk;renderTradeDesk=function(){baseDesk();if(state.position?.source==="SMC AUTO SIGNAL"){$("tradeDeskStatus").textContent="AUTO SIGNAL · REVIEW";$("deskDirection").textContent="AUTO SMC · "+state.position.direction+" · "+state.position.symbol}};
 const baseDraw=drawChart;drawChart=function(){baseDraw();renderScriptOverlay();checkAlerts()};
-document.addEventListener("DOMContentLoaded",ensureUi);
+document.addEventListener("DOMContentLoaded",()=>{ensureUi();applyChartPrefs()});
 })();
