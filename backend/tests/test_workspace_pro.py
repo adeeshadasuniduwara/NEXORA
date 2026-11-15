@@ -12,7 +12,7 @@ def test_pro_chart_workspace_assets_and_context_menu_are_served():
     assert 'workspace_pro.js' in page.text
     assert 'workspace_pro.css' in page.text
     assert script.status_code == 200
-    for feature in ("Reset chart view", "Table view", "Object tree", "Chart settings", "autoSignal", "compileScript", "nexoraContextMenu"):
+    for feature in ("Reset chart view", "nexoraResetChartBtn", "Table view", "Object tree", "Chart settings", "autoSignal", "compileScript", "nexoraContextMenu"):
         assert feature in script.text
     assert styles.status_code == 200
     assert ".nx-context" in styles.text
