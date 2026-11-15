@@ -177,7 +177,9 @@ function drawPosition(ctx,p,y,pad,width){
 function drawManualMark(ctx,d,x,y,pad,width,height){
  ctx.save();ctx.strokeStyle=d.color||"#91a9c9";ctx.fillStyle=d.color||"#91a9c9";ctx.lineWidth=1.4;
  if(d.type==="horizontal"){const yy=y(d.price);ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(pad.left,yy);ctx.lineTo(width-pad.right,yy);ctx.stroke();ctx.fillText(d.label||"Level",pad.left+5,yy-5)}
- if(d.type==="trendline"&&d.p1&&d.p2){ctx.beginPath();ctx.moveTo(x(d.p1.index),y(d.p1.price));ctx.lineTo(x(d.p2.index),y(d.p2.price));ctx.stroke()}
+ if((d.type==="trendline"||d.type==="ray")&&d.p1&&d.p2){const x1=x(d.p1.index),y1=y(d.p1.price),x2=x(d.p2.index),y2=y(d.p2.price);ctx.beginPath();ctx.moveTo(x1,y1);if(d.type==="ray"){const endX=width-pad.right,ratio=(endX-x1)/(x2-x1||1);ctx.lineTo(endX,y1+(y2-y1)*ratio)}else ctx.lineTo(x2,y2);ctx.stroke()}
+ if(d.type==="vertical"){const xx=x(d.index);ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(xx,pad.top);ctx.lineTo(xx,height-22);ctx.stroke();ctx.setLineDash([]);ctx.font="8px DM Mono";ctx.fillText(d.label||"Time",xx+4,pad.top+12)}
+ if(d.type==="fib"&&d.p1&&d.p2){const levels=[0,.236,.382,.5,.618,.786,1],x1=x(Math.min(d.p1.index,d.p2.index)),x2=Math.max(x1+8,Math.min(width-pad.right,x(Math.max(d.p1.index,d.p2.index)))),delta=d.p2.price-d.p1.price;levels.forEach(level=>{const price=d.p2.price-delta*level,yy=y(price);ctx.globalAlpha=.82;ctx.setLineDash(level===.5?[]:[3,3]);ctx.beginPath();ctx.moveTo(x1,yy);ctx.lineTo(x2,yy);ctx.stroke();ctx.setLineDash([]);ctx.font="8px DM Mono";ctx.fillText((level*100).toFixed(1)+"% · "+fmt(price),x2-4,yy-3)});ctx.globalAlpha=1}
  if(d.type==="rectangle"&&d.p1&&d.p2){const xx=x(Math.min(d.p1.index,d.p2.index)),yy=y(Math.max(d.p1.price,d.p2.price)),w=Math.abs(d.p2.index-d.p1.index)*((width-pad.left-pad.right)/state.view.visible),h=Math.abs(y(d.p1.price)-y(d.p2.price));ctx.globalAlpha=.12;ctx.fillRect(xx,yy,w,h);ctx.globalAlpha=1;ctx.strokeRect(xx,yy,w,h)}
  if(d.type==="text"){ctx.font="11px Manrope";ctx.fillText(d.text||"Note",x(d.index),y(d.price))}
  ctx.restore();
@@ -408,9 +410,9 @@ function bindChartTools(){
    if(!state.position){createPosition(state.drawTool==="long"?"LONG":"SHORT",priceAt(event.clientY));state.drawTool="cursor";$("positionLongBtn").classList.remove("tool-active");$("positionShortBtn").classList.remove("tool-active")}
    return;
   }
-  if(state.drawTool==="horizontal"){state.drawings.push({type:"horizontal",price:priceAt(event.clientY),label:"Manual level"});saveWorkspaceMarks();drawChart();return}
+  if(state.drawTool==="horizontal"){state.drawings.push({type:"horizontal",price:priceAt(event.clientY),label:"Manual level"});saveWorkspaceMarks();drawChart();return}\n  if(state.drawTool==="vertical"){state.drawings.push({type:"vertical",index:chartIndexAt(event.clientX),label:"Time marker"});saveWorkspaceMarks();drawChart();return}
   if(state.drawTool==="text"){const note=window.prompt("Chart note:");if(note){state.drawings.push({type:"text",index:chartIndexAt(event.clientX),price:priceAt(event.clientY),text:note.slice(0,80)});saveWorkspaceMarks();drawChart()}return}
-  if(state.drawTool==="trendline"||state.drawTool==="rectangle"){
+  if(state.drawTool==="trendline"||state.drawTool==="rectangle"||state.drawTool==="fib"||state.drawTool==="ray"){
    const point={index:chartIndexAt(event.clientX),price:priceAt(event.clientY)};
    if(!state.draft){state.draft={type:state.drawTool,p1:point,p2:point};}
    else{state.draft.p2=point;state.drawings.push(state.draft);state.draft=null;saveWorkspaceMarks();drawChart()}
