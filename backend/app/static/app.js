@@ -1,5 +1,5 @@
 const API="/api/v1";
-const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],analysis:null,view:{end:0,visible:120,follow:true},historyLoading:false,historyExhausted:false,indicators:{ema20:true,ema50:true,sma200:false,bb:false,rsi:true},confirmations:{structure:true,fvg:true,ob:true,liquidity:true,eq:true,ema:true,rsi:true,volume:false},drawTool:"cursor",drawings:[],draft:null,position:null,dragging:null,socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]},paintQueued:false,analysisQueued:false,bookRenderQueued:false,pressureQueued:false,lastAnalysisAt:0,searchMatches:[]};
+const state={symbol:"BTCUSDT",interval:"1h",candles:[],symbols:[],tickerMap:new Map(),priceHistory:new Map(),symbolSet:new Set(),trades:[],analysis:null,view:{end:0,visible:120,follow:true},historyLoading:false,historyExhausted:false,indicators:{ema20:true,ema50:true,sma200:false,bb:false,rsi:true},confirmations:{structure:true,fvg:true,ob:true,liquidity:true,eq:true,ema:true,rsi:true,volume:false},drawTool:"cursor",drawings:[],draft:null,position:null,dragging:null,socket:null,socketGeneration:0,retryTimer:null,resizeTimer:null,bookLastUpdateAt:0,book:{bids:[],asks:[]},paintQueued:false,analysisQueued:false,bookRenderQueued:false,pressureQueued:false,lastAnalysisAt:0,searchMatches:[],priceScale:null};
 const $=id=>document.getElementById(id);
 const fmt=(v,max=8)=>Number(v||0).toLocaleString("en-US",{maximumFractionDigits:max});
 const compact=v=>{const n=Number(v||0);return n>=1e9?(n/1e9).toFixed(2)+"B":n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(2)+"K":fmt(n,2)};
@@ -137,9 +137,9 @@ function drawChart(){
  const ema20=indicatorSeries(allCloses,20).slice(begin,end),ema50=indicatorSeries(allCloses,50).slice(begin,end),sma200=indicatorSeries(allCloses,200).slice(begin,end),mid=indicatorSeries(allCloses,20,"sma").slice(begin,end);
  const allMid=indicatorSeries(allCloses,20,"sma"),allSd=allCloses.map((_,i)=>i<19?null:Math.sqrt(allCloses.slice(i-19,i+1).reduce((sum,v)=>sum+(v-allMid[i])**2,0)/20)),sd=allSd.slice(begin,end);
  let low=Math.min(...lows),high=Math.max(...highs);const position=state.position;
- if(position){[position.entry,position.stop,position.tp1,position.tp2,position.tp3].forEach(v=>{if(Number.isFinite(+v)){low=Math.min(low,+v);high=Math.max(high,+v)}})}
+ if(position&&position.source==="SMC AUTO SIGNAL"&&position.symbol===state.symbol){[position.entry,position.stop,position.tp1,position.tp2,position.tp3].forEach(v=>{if(Number.isFinite(+v)){low=Math.min(low,+v);high=Math.max(high,+v)}})}
  if(state.drawings.length){state.drawings.forEach(d=>{if(d.price){low=Math.min(low,d.price);high=Math.max(high,d.price)}if(d.p1?.price){low=Math.min(low,d.p1.price);high=Math.max(high,d.p1.price)}if(d.p2?.price){low=Math.min(low,d.p2.price);high=Math.max(high,d.p2.price)}})}
- const range=(high-low)||1;low-=range*.06;high+=range*.06;const y=v=>pad.top+(high-v)/(high-low)*chartH,step=chartW/state.view.visible,bodyW=Math.max(2,Math.min(9,step*.64)),x=i=>pad.left+(i-begin+.5)*step;
+ const range=(high-low)||1;low-=range*.06;high+=range*.06;if(state.priceScale){const center=(state.priceScale.min+state.priceScale.max)/2,span=Math.max(Number.EPSILON,state.priceScale.max-state.priceScale.min);low=center-span/2;high=center+span/2}const y=v=>pad.top+(high-v)/(high-low)*chartH,step=chartW/state.view.visible,bodyW=Math.max(2,Math.min(9,step*.64)),x=i=>pad.left+(i-begin+.5)*step;
  ctx.font="9px DM Mono";ctx.textAlign="right";ctx.strokeStyle=window.NEXORA_SHOW_GRID===false?"#00000000":"#243247";ctx.fillStyle="#8795a9";
  for(let i=0;i<=5;i++){const yy=pad.top+chartH*i/5;ctx.beginPath();ctx.moveTo(pad.left,yy);ctx.lineTo(width-pad.right,yy);ctx.stroke();ctx.fillText(fmt(high-(high-low)*i/5),width-5,yy+3)}
  data.forEach((c,i)=>{const xx=x(begin+i),up=+c.close>=+c.open,color=up?(window.NEXORA_CHART_UP||"#70e5bd"):(window.NEXORA_CHART_DOWN||"#f17e8c"),top=Math.min(y(+c.open),y(+c.close)),bodyH=Math.max(1,Math.abs(y(+c.open)-y(+c.close)));ctx.strokeStyle=color;ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(xx,y(+c.high));ctx.lineTo(xx,y(+c.low));ctx.stroke();ctx.fillRect(xx-bodyW/2,top,bodyW,bodyH)});
@@ -168,7 +168,7 @@ function drawChart(){
 
  state.drawings.forEach(d=>drawManualMark(ctx,d,x,y,pad,width,height));
  if(state.draft)drawManualMark(ctx,state.draft,x,y,pad,width,height);
- if(position&&position.symbol===state.symbol)drawPosition(ctx,position,y,pad,width);
+ if(position&&position.source==="SMC AUTO SIGNAL"&&position.symbol===state.symbol)drawPosition(ctx,position,y,pad,width);
  const last=data.at(-1),lastY=y(+last.close);ctx.setLineDash([4,4]);ctx.strokeStyle="#70e5bd88";ctx.beginPath();ctx.moveTo(pad.left,lastY);ctx.lineTo(width-pad.right,lastY);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#173d36";ctx.fillRect(width-pad.right+4,lastY-9,74,18);ctx.fillStyle="#a2f4d9";ctx.textAlign="center";ctx.fillText(fmt(last.close),width-pad.right+41,lastY+3);
  drawRsi(allCloses);
 }
@@ -382,13 +382,13 @@ function chartIndexAt(clientX){
  const rect=$("candleChart").getBoundingClientRect(),x=clientX-rect.left,left=10,right=82,step=(rect.width-left-right)/state.view.visible;
  return Math.max(0,Math.min(state.candles.length-1,(state.view.end||state.candles.length)-state.view.visible+Math.floor((x-left)/step)));
 }
-function updatePositionLevel(level,price){
- const p=state.position;if(!p)return;
- p[level]=price;
- const risk=Math.abs(p.entry-p.stop),sign=p.direction==="LONG"?1:-1;
- if(level==="entry"){p.tp1=price+sign*risk;p.tp2=price+sign*risk*2;p.tp3=price+sign*risk*3}
- else if(level==="stop"){p.tp1=p.entry+sign*risk;p.tp2=p.entry+sign*risk*2;p.tp3=p.entry+sign*risk*3}
- saveWorkspaceMarks();renderTradeDesk();drawChart();
+function chartPriceBounds(){
+ const end=Math.min(state.candles.length,state.view.end||state.candles.length),begin=Math.max(0,end-state.view.visible),data=state.candles.slice(begin,end);
+ if(!data.length)return {min:0,max:1};
+ let min=Math.min(...data.map(c=>+c.low)),max=Math.max(...data.map(c=>+c.high));
+ if(state.position?.source==="SMC AUTO SIGNAL"&&state.position.symbol===state.symbol)[state.position.entry,state.position.stop,state.position.tp1,state.position.tp2,state.position.tp3].forEach(v=>{min=Math.min(min,+v);max=Math.max(max,+v)});
+ state.drawings.forEach(d=>[d.price,d.p1?.price,d.p2?.price].filter(Number.isFinite).forEach(v=>{min=Math.min(min,v);max=Math.max(max,v)}));
+ const pad=((max-min)||1)*.06;return {min:min-pad,max:max+pad};
 }
 function bindChartTools(){
  const canvas=$("candleChart");let pointerStart=null;
@@ -422,26 +422,35 @@ function bindChartTools(){
    else{state.draft.p2=point;state.drawings.push(state.draft);state.draft=null;saveWorkspaceMarks();drawChart()}
    return;
   }
-  if(state.position){
-   const levelNames=["entry","stop","tp1","tp2","tp3"],nearest=levelNames.map(name=>({name,dist:Math.abs(priceAt(event.clientY)-state.position[name])})).sort((a,b)=>a.dist-b.dist)[0];
-   const rectH=canvas.getBoundingClientRect().height,visible=state.candles.slice(Math.max(0,(state.view.end||state.candles.length)-state.view.visible),state.view.end||state.candles.length),range=Math.max(...visible.map(c=>+c.high))-Math.min(...visible.map(c=>+c.low))||1;
-   if(nearest&&nearest.dist<range*.025){state.dragging={level:nearest.name};canvas.setPointerCapture(event.pointerId);return}
+  if(px>=rect.width-82&&py>=12&&py<=rect.height-(state.indicators.rsi?88:22)){
+   const bounds=state.priceScale||chartPriceBounds();
+   state.dragging={priceScale:true,startY:event.clientY,min:bounds.min,max:bounds.max};
+   canvas.setPointerCapture(event.pointerId);return;
   }
   state.dragging={pan:true,startX:event.clientX,startEnd:state.view.end||state.candles.length};pointerStart=event.clientX;canvas.setPointerCapture(event.pointerId);
  });
  canvas.addEventListener("pointermove",event=>{
   if(state.draft&&!state.dragging){state.draft.p2={index:chartIndexAt(event.clientX),price:priceAt(event.clientY)};drawChart();return}
   if(!state.dragging)return;
-  if(state.dragging.level){updatePositionLevel(state.dragging.level,priceAt(event.clientY));return}
+  if(state.dragging.priceScale){
+   const center=(state.dragging.min+state.dragging.max)/2,span=state.dragging.max-state.dragging.min,factor=Math.exp((event.clientY-state.dragging.startY)*.006),next=span*factor;
+   state.priceScale={min:center-next/2,max:center+next/2};drawChart();return;
+  }
   if(state.dragging.pan&&pointerStart!==null){
    const rect=canvas.getBoundingClientRect(),step=(rect.width-92)/state.view.visible,delta=Math.round((pointerStart-event.clientX)/step);
    state.view.end=Math.max(state.view.visible,Math.min(state.candles.length,state.dragging.startEnd+delta));state.view.follow=state.view.end>=state.candles.length;$("liveChartBtn").classList.toggle("tool-active",state.view.follow);drawChart();if(state.view.end<=state.view.visible+2&&delta>0)loadOlderHistory();
   }
  });
- const finish=()=>{if(state.dragging?.level)saveWorkspaceMarks();state.dragging=null;pointerStart=null};
+ const finish=()=>{state.dragging=null;pointerStart=null};
  canvas.addEventListener("pointerup",finish);canvas.addEventListener("pointercancel",finish);
+ canvas.addEventListener("dblclick",event=>{const rect=canvas.getBoundingClientRect();if(event.clientX-rect.left>=rect.width-82){state.priceScale=null;drawChart()}});
  canvas.addEventListener("wheel",event=>{
-  event.preventDefault();const old=state.view.visible,next=Math.max(30,Math.min(300,Math.round(old*(event.deltaY>0?1.15:.87))));
+  event.preventDefault();const rect=canvas.getBoundingClientRect(),px=event.clientX-rect.left;
+  if(px>=rect.width-82){
+   const bounds=state.priceScale||chartPriceBounds(),factor=event.deltaY>0?1.12:.89,center=(bounds.min+bounds.max)/2,span=(bounds.max-bounds.min)*factor;
+   state.priceScale={min:center-span/2,max:center+span/2};drawChart();return;
+  }
+  const old=state.view.visible,next=Math.max(30,Math.min(300,Math.round(old*(event.deltaY>0?1.15:.87))));
   const anchor=chartIndexAt(event.clientX),ratio=(anchor-(state.view.end-old))/old;state.view.visible=next;state.view.end=Math.min(state.candles.length,Math.max(next,Math.round(anchor+next*(1-ratio))));state.view.follow=false;$("liveChartBtn").classList.remove("tool-active");drawChart();
  },{passive:false});
 }
