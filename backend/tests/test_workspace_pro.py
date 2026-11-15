@@ -29,6 +29,9 @@ def test_pine_subset_is_explicitly_limited_and_safe():
     assert "plot(ta.ema" in script
     assert "unsupported syntax" in script
     assert "eval(" not in script
+    assert "Ctrl + C" in script
+    assert "altKey&&e.key.toLowerCase()==="a"" in script
     app = client.get("/assets/app.js").text
     assert "if(state.draft&&!state.dragging)" in app
     assert "if(state.draft)drawManualMark" in app
+    assert "if(event.button!==0)return" in app
