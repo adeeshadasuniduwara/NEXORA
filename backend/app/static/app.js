@@ -390,7 +390,7 @@ function chartPriceBounds(){
  state.drawings.forEach(d=>[d.price,d.p1?.price,d.p2?.price].filter(Number.isFinite).forEach(v=>{min=Math.min(min,v);max=Math.max(max,v)}));
  const pad=((max-min)||1)*.06;return {min:min-pad,max:max+pad};
 }
-function bindChartTools()
+function bindChartTools(){
  const canvas=$("candleChart");let pointerStart=null;
  document.querySelectorAll("[data-draw]").forEach(btn=>btn.addEventListener("click",()=>{
   if(state.drawTool!==btn.dataset.draw&&state.draft){state.draft=null;drawChart()}state.drawTool=btn.dataset.draw;document.querySelectorAll("[data-draw]").forEach(b=>b.classList.toggle("tool-active",b===btn));
