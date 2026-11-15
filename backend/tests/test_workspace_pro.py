@@ -30,7 +30,7 @@ def test_pine_subset_is_explicitly_limited_and_safe():
     assert "unsupported syntax" in script
     assert "eval(" not in script
     assert "Ctrl + C" in script
-    assert "altKey&&e.key.toLowerCase()==="a"" in script
+    assert 'altKey&&e.key.toLowerCase()==="a"' in script
     app_script = client.get("/assets/app.js").text
     assert "if(state.draft&&!state.dragging)" in app_script
     assert "if(state.draft)drawManualMark" in app_script
