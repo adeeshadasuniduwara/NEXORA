@@ -115,7 +115,7 @@ function compileScript(source){
  lines.forEach((line,index)=>{const s=line.trim();if(!s||s.startsWith("//")||s.startsWith("indicator(")||s.startsWith("study("))return;
  let m=s.match(/^plot\s*\(\s*(close|open|high|low|volume)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
  if(m){plots.push({name:m[2]||m[1],values:a[m[1]]});return}
- m=s.match(/^plot\s*\(\s*ta\.(ema|sma|rsi)\s*\(\s*(close|open|high|low|volume)\s*,\s*(\d{1,3})\s*\)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
+ m=s.match(/^plot\s*\(\s*ta\.(ema|sma)\s*\(\s*(close|open|high|low|volume)\s*,\s*(\d{1,3})\s*\)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
  if(m){const p=Number(m[3]);if(p<2||p>200){errors.push("Line "+(index+1)+": period must be 2–200");return}plots.push({name:m[4]||m[1].toUpperCase()+" "+p,values:m[1]==="ema"?ema(a[m[2]],p):sma(a[m[2]],p)});return}
  m=s.match(/^hline\s*\(\s*(-?\d+(?:\.\d+)?)\s*\)\s*$/);if(m){plots.push({name:"hline "+m[1],values:Array(a.close.length).fill(Number(m[1]))});return}
  errors.push("Line "+(index+1)+": unsupported syntax — use plot(close/open/high/low), plot(ta.ema/sma(source, period)) or hline(price).");
@@ -143,6 +143,7 @@ function autoSignal(){
  createPosition(long?"LONG":"SHORT",Number(state.candles.at(-1).close));if(state.position){state.position.source="SMC AUTO SIGNAL";state.position.signalKey=signalKey;saveWorkspaceMarks();renderTradeDesk();drawChart();openModal("SMC signal · position added",el("p",{class:"nx-note"},(long?"Bullish":"Bearish")+" structure break with aligned trend and "+(idm?"inducement":"imbalance/block")+" confirmation. A draft position has been drawn. Review Entry, SL and targets; no exchange order was sent."))}
 }
 const baseCalc=calculateAnalysis;calculateAnalysis=function(){baseCalc();autoSignal()};
+const baseDesk=renderTradeDesk;renderTradeDesk=function(){baseDesk();if(state.position?.source==="SMC AUTO SIGNAL"){$("tradeDeskStatus").textContent="AUTO SIGNAL · REVIEW";$("deskDirection").textContent="AUTO SMC · "+state.position.direction+" · "+state.position.symbol}};
 const baseDraw=drawChart;drawChart=function(){baseDraw();renderScriptOverlay();checkAlerts()};
 document.addEventListener("DOMContentLoaded",ensureUi);
 })();
