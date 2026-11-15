@@ -164,6 +164,7 @@ function drawChart(){
   a.swingLabels.filter(e=>e.index>=begin&&e.index<end).forEach(e=>{const xx=x(e.index),yy=y(e.price),color=e.bearish?"#f17e8c":"#70e5bd";ctx.save();ctx.strokeStyle=color+"88";ctx.beginPath();ctx.moveTo(xx,yy);ctx.lineTo(xx,yy+(e.bearish?-7:7));ctx.stroke();ctx.restore();smartTag(e.label,xx,yy+(e.label==="HH"||e.label==="LH"?-12:12),color,0)});
   a.events.filter(e=>e.index>=begin&&e.index<end).slice(-8).forEach(e=>{const xx=x(e.index),yy=y(e.price),color=e.bearish?"#f17e8c":"#70e5bd",prior=e.brokenSwing;if(prior){const px=x(prior.index);ctx.save();ctx.strokeStyle=color;ctx.globalAlpha=.75;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(Math.max(pad.left,px),yy);ctx.lineTo(xx,yy);ctx.stroke();ctx.setLineDash([]);ctx.restore()}smartTag(e.kind==="CHoCH"?"CHoCH":"BOS",xx,yy+(e.bearish?14:-14),color,1)})
  }
+ }
 
  state.drawings.forEach(d=>drawManualMark(ctx,d,x,y,pad,width,height));
  if(position&&position.symbol===state.symbol)drawPosition(ctx,position,y,pad,width);
