@@ -12,7 +12,7 @@ def test_pro_chart_workspace_assets_and_context_menu_are_served():
     assert 'workspace_pro.js' in page.text
     assert 'workspace_pro.css' in page.text
     assert script.status_code == 200
-    for feature in ("Reset chart view", "Table view", "Object tree", "Chart settings", "autoSignal", "compileScript", "nexoraContextMenu"):
+    for feature in ("Reset chart view", "nexoraResetChartBtn", "Table view", "Object tree", "Chart settings", "autoSignal", "compileScript", "nexoraContextMenu"):
         assert feature in script.text
     assert styles.status_code == 200
     assert ".nx-context" in styles.text
@@ -29,3 +29,9 @@ def test_pine_subset_is_explicitly_limited_and_safe():
     assert "plot(ta.ema" in script
     assert "unsupported syntax" in script
     assert "eval(" not in script
+    assert "Ctrl + C" in script
+    assert 'altKey&&e.key.toLowerCase()==="a"' in script
+    app_script = client.get("/assets/app.js").text
+    assert "if(state.draft&&!state.dragging)" in app_script
+    assert "if(state.draft)drawManualMark" in app_script
+    assert "if(event.button!==0)return" in app_script
