@@ -68,11 +68,10 @@ function loadTemplate(){
  try{const t=JSON.parse(localStorage.getItem("nexora-chart-template-default")||"null");if(!t)throw Error("No saved template found.");state.indicators={...state.indicators,...t.indicators};state.confirmations={...state.confirmations,...t.confirmations};state.drawings=Array.isArray(t.drawings)?t.drawings:[];state.view.visible=Number(t.visible)||120;document.querySelectorAll("[data-indicator]").forEach(i=>i.checked=!!state.indicators[i.dataset.indicator]);document.querySelectorAll("[data-confirm]").forEach(i=>i.checked=!!state.confirmations[i.dataset.confirm]);saveWorkspaceMarks();drawChart();menu.classList.add("hidden")}catch(e){openModal("Chart template",el("p",{class:"nx-note"},e.message))}
 }
 function addPriceAlert(price){
- const value=Number(price);if(!Number.isFinite(value)||value<=0)return;
- alerts.push({id:Date.now(),symbol:state.symbol,price:value,createdAt:Date.now(),triggered:false});try{localStorage.setItem("nexora-price-alerts",JSON.stringify(alerts))}catch(e){}
- openModal("Price alert created",el("p",{class:"nx-note"},state.symbol+" alert set at "+value+". It will trigger while this browser workspace is running."));
+ const value=Number(price);if(!Number.isFinite(value)||value<=0)return false;
+ alerts.push({id:Date.now(),symbol:state.symbol,price:value,createdAt:Date.now(),triggered:false});try{localStorage.setItem("nexora-price-alerts",JSON.stringify(alerts))}catch(e){}return true;
 }
-function showAlertDialog(price){const body=el("div",{class:"nx-settings"}),input=el("input",{type:"number",step:"any",value:String(price),class:"nx-input"});body.append(el("p",{class:"nx-note"},"Create a local browser alert for "+state.symbol+"."),input);openModal("Add price alert",body,[{label:"Create alert",primary:true,onClick:()=>{addPriceAlert(input.value);modal.classList.add("hidden")}},{label:"Cancel",onClick:()=>modal.classList.add("hidden")}])}
+function showAlertDialog(price){const body=el("div",{class:"nx-settings"}),input=el("input",{type:"number",step:"any",value:String(price),class:"nx-input"});body.append(el("p",{class:"nx-note"},"Create a local browser alert for "+state.symbol+"."),input);openModal("Add price alert",body,[{label:"Create alert",primary:true,onClick:()=>{const ok=addPriceAlert(input.value);modal.classList.add("hidden");if(ok)openModal("Price alert created",el("p",{class:"nx-note"},state.symbol+" alert set at "+input.value+". It will trigger while this browser workspace is running."))}},{label:"Cancel",onClick:()=>modal.classList.add("hidden")}])}
 function openContextMenu(event){
  event.preventDefault();const rect=$("candleChart").getBoundingClientRect(),price=priceAt(event.clientY);
  const items=[
@@ -93,7 +92,7 @@ function openContextMenu(event){
 }
 function drawCrosshair(event){
  if(!overlay||!prefs.showCrosshair)return;
- renderScriptOverlay();const rect=overlay.getBoundingClientRect(),dpr=devicePixelRatio||1,x=(event.clientX-rect.left)*dpr,y=(event.clientY-rect.top)*dpr,ctx=overlay.getContext("2d");
+ renderScriptOverlay();const rect=overlay.getBoundingClientRect(),dpr=devicePixelRatio||1;let x=(event.clientX-rect.left)*dpr;const y=(event.clientY-rect.top)*dpr,ctx=overlay.getContext("2d");
  if(lockedTime!==null){const idx=state.candles.findIndex(c=>Number(c.open_time)===Number(lockedTime));if(idx>=0){const end=Math.min(state.candles.length,state.view.end||state.candles.length),begin=Math.max(0,end-state.view.visible),step=(rect.width-92)/state.view.visible;x=(10+(idx-begin+.5)*step)*dpr}}ctx.save();ctx.strokeStyle="#9eb3ca88";ctx.setLineDash([3*dpr,4*dpr]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,overlay.height);ctx.moveTo(0,y);ctx.lineTo(overlay.width,y);ctx.stroke();ctx.restore();
 }
 function renderScriptOverlay(){
@@ -113,7 +112,7 @@ function rsi(values,n){const out=Array(values.length).fill(NaN);if(values.length
 function compileScript(source){
  const a=arrays(),lines=source.split(/\r?\n/),plots=[],errors=[];
  lines.forEach((line,index)=>{const s=line.trim();if(!s||s.startsWith("//")||s.startsWith("indicator(")||s.startsWith("study("))return;
- let m=s.match(/^plot\s*\(\s*(close|open|high|low|volume)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
+ let m=s.match(/^plot\s*\(\s*(close|open|high|low)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
  if(m){plots.push({name:m[2]||m[1],values:a[m[1]]});return}
  m=s.match(/^plot\s*\(\s*ta\.(ema|sma)\s*\(\s*(close|open|high|low|volume)\s*,\s*(\d{1,3})\s*\)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
  if(m){const p=Number(m[3]);if(p<2||p>200){errors.push("Line "+(index+1)+": period must be 2–200");return}plots.push({name:m[4]||m[1].toUpperCase()+" "+p,values:m[1]==="ema"?ema(a[m[2]],p):sma(a[m[2]],p)});return}
