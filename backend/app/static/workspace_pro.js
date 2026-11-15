@@ -43,7 +43,7 @@ function showSettings(){
  field("Show crosshair",checkbox(prefs.showCrosshair,v=>{prefs.showCrosshair=v;savePrefs();drawChart()}));
  const count=el("select");[60,90,120,150,200,300].forEach(n=>{const o=el("option",{value:String(n)},n+" candles");if(n===prefs.visibleCandles)o.selected=true;count.append(o)});count.onchange=()=>{prefs.visibleCandles=Number(count.value);state.view.visible=prefs.visibleCandles;drawChart();savePrefs()};field("Default visible candles",count);
  const alertSound=checkbox(prefs.alertSound,v=>{prefs.alertSound=v;savePrefs()});field("Alert sound (browser)",alertSound);
- const note=el("p",{class:"nx-note"},"Settings and chart objects are stored in this browser only. NEXORA does not send exchange orders.");
+ const note=el("p",{class:"nx-note"},"Settings and chart objects are stored in this browser only. NEXORA does not send exchange orders.");body.append(note);
  openModal("Chart settings",body,[{label:"Reset chart view",onClick:resetView},{label:"Done",primary:true,onClick:()=>modal.classList.add("hidden")}]);
 }
 function showTable(){
@@ -78,7 +78,8 @@ function openContextMenu(event){
  const items=[
  ["↶","Reset chart view","Alt + R",resetView],
  ["▣","Copy price "+Number(price).toPrecision(10),"",()=>copyPrice(price)],
- ["＋","Paste drawing","Ctrl + V",()=>{try{const d=JSON.parse(sessionStorage.getItem("nexora-drawing-clipboard")||"null");if(d){state.drawings.push(d);saveWorkspaceMarks();drawChart()}}catch(e){}menu.classList.add("hidden")}],
+ ["⧉","Copy latest drawing","",()=>{const d=state.drawings.at(-1);if(d){try{sessionStorage.setItem("nexora-drawing-clipboard",JSON.stringify(d))}catch(e){}}menu.classList.add("hidden")}],
+ ["＋","Paste drawing","Ctrl + V",()=>{try{const d=JSON.parse(sessionStorage.getItem("nexora-drawing-clipboard")||"null");if(d){state.drawings.push(JSON.parse(JSON.stringify(d)));saveWorkspaceMarks();drawChart()}}catch(e){}menu.classList.add("hidden")}],
  ["◷","Add alert at "+Number(price).toPrecision(9),"Alt + A",()=>{menu.classList.add("hidden");showAlertDialog(price)}],
  ["│","Lock vertical cursor line by time","",()=>{lockedTime=state.candles[chartIndexAt(event.clientX)]?.open_time??null;menu.classList.add("hidden")}],
  ["▤","Table view","",showTable],["☷","Object tree","",showObjects],
@@ -93,7 +94,7 @@ function openContextMenu(event){
 function drawCrosshair(event){
  if(!overlay||!prefs.showCrosshair)return;
  renderScriptOverlay();const rect=overlay.getBoundingClientRect(),dpr=devicePixelRatio||1,x=(event.clientX-rect.left)*dpr,y=(event.clientY-rect.top)*dpr,ctx=overlay.getContext("2d");
- ctx.save();ctx.strokeStyle="#9eb3ca88";ctx.setLineDash([3*dpr,4*dpr]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,overlay.height);ctx.moveTo(0,y);ctx.lineTo(overlay.width,y);ctx.stroke();ctx.restore();
+ if(lockedTime!==null){const idx=state.candles.findIndex(c=>Number(c.open_time)===Number(lockedTime));if(idx>=0){const end=Math.min(state.candles.length,state.view.end||state.candles.length),begin=Math.max(0,end-state.view.visible),step=(rect.width-92)/state.view.visible;x=(10+(idx-begin+.5)*step)*dpr}}ctx.save();ctx.strokeStyle="#9eb3ca88";ctx.setLineDash([3*dpr,4*dpr]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,overlay.height);ctx.moveTo(0,y);ctx.lineTo(overlay.width,y);ctx.stroke();ctx.restore();
 }
 function renderScriptOverlay(){
  if(!overlay)return;const rect=overlay.getBoundingClientRect(),dpr=devicePixelRatio||1;overlay.width=Math.max(1,Math.floor(rect.width*dpr));overlay.height=Math.max(1,Math.floor(rect.height*dpr));const ctx=overlay.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);
@@ -115,14 +116,14 @@ function compileScript(source){
  let m=s.match(/^plot\s*\(\s*(close|open|high|low|volume)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
  if(m){plots.push({name:m[2]||m[1],values:a[m[1]]});return}
  m=s.match(/^plot\s*\(\s*ta\.(ema|sma|rsi)\s*\(\s*(close|open|high|low|volume)\s*,\s*(\d{1,3})\s*\)\s*(?:,\s*title\s*=\s*"([^"]+)")?\s*\)\s*$/);
- if(m){const p=Number(m[3]);if(p<2||p>200){errors.push("Line "+(index+1)+": period must be 2–200");return}plots.push({name:m[4]||m[1].toUpperCase()+" "+p,values:m[1]==="ema"?ema(a[m[2]],p):m[1]==="sma"?sma(a[m[2]],p):rsi(a[m[2]],p)});return}
+ if(m){const p=Number(m[3]);if(p<2||p>200){errors.push("Line "+(index+1)+": period must be 2–200");return}plots.push({name:m[4]||m[1].toUpperCase()+" "+p,values:m[1]==="ema"?ema(a[m[2]],p):sma(a[m[2]],p)});return}
  m=s.match(/^hline\s*\(\s*(-?\d+(?:\.\d+)?)\s*\)\s*$/);if(m){plots.push({name:"hline "+m[1],values:Array(a.close.length).fill(Number(m[1]))});return}
- errors.push("Line "+(index+1)+": unsupported syntax — use plot(close/open/high/low), plot(ta.ema/sma/rsi(source, period)) or hline(price).");
+ errors.push("Line "+(index+1)+": unsupported syntax — use plot(close/open/high/low), plot(ta.ema/sma(source, period)) or hline(price).");
  });
  return {plots,errors};
 }
 function showScriptEditor(){
- const body=el("div",{class:"nx-script-editor"}),help=el("div",{class:"nx-script-help"},"Supported safe subset: plot(close), plot(ta.ema(close, 20)), plot(ta.sma(close, 50)), plot(ta.rsi(close, 14)), hline(100). This is not the full TradingView Pine Script language.");
+ const body=el("div",{class:"nx-script-editor"}),help=el("div",{class:"nx-script-help"},"Supported safe subset: plot(close), plot(ta.ema(close, 20)), plot(ta.sma(close, 50)), hline(100). This is not the full TradingView Pine Script language.");
  const area=el("textarea",{class:"nx-code",spellcheck:"false"});area.value=localStorage.getItem("nexora-pine-source")||'indicator("NEXORA EMA", overlay=true)\nplot(ta.ema(close, 20), title="EMA 20")\nplot(ta.ema(close, 50), title="EMA 50")';
  const result=el("pre",{class:"nx-script-result"},"Run a script to see validation results.");body.append(help,area,result);
  openModal("Pine Script · compatible subset",body,[{label:"Clear plots",onClick:()=>{scriptSeries=[];renderScriptOverlay();result.textContent="Plots cleared."}},{label:"Add to chart",primary:true,onClick:()=>{const compiled=compileScript(area.value);if(compiled.errors.length){result.textContent=compiled.errors.join("\n");return}scriptSeries=compiled.plots;localStorage.setItem("nexora-pine-source",area.value);renderScriptOverlay();result.textContent="Compiled "+compiled.plots.length+" plot(s): "+compiled.plots.map(p=>p.name).join(", ")+"."}}]);
