@@ -167,6 +167,7 @@ function drawChart(){
  }
 
  state.drawings.forEach(d=>drawManualMark(ctx,d,x,y,pad,width,height));
+ if(state.draft)drawManualMark(ctx,state.draft,x,y,pad,width,height);
  if(position&&position.symbol===state.symbol)drawPosition(ctx,position,y,pad,width);
  const last=data.at(-1),lastY=y(+last.close);ctx.setLineDash([4,4]);ctx.strokeStyle="#70e5bd88";ctx.beginPath();ctx.moveTo(pad.left,lastY);ctx.lineTo(width-pad.right,lastY);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#173d36";ctx.fillRect(width-pad.right+4,lastY-9,74,18);ctx.fillStyle="#a2f4d9";ctx.textAlign="center";ctx.fillText(fmt(last.close),width-pad.right+41,lastY+3);
  drawRsi(allCloses);
@@ -392,7 +393,7 @@ function updatePositionLevel(level,price){
 function bindChartTools(){
  const canvas=$("candleChart");let pointerStart=null;
  document.querySelectorAll("[data-draw]").forEach(btn=>btn.addEventListener("click",()=>{
-  state.drawTool=btn.dataset.draw;document.querySelectorAll("[data-draw]").forEach(b=>b.classList.toggle("tool-active",b===btn));
+  if(state.drawTool!==btn.dataset.draw&&state.draft){state.draft=null;drawChart()}state.drawTool=btn.dataset.draw;document.querySelectorAll("[data-draw]").forEach(b=>b.classList.toggle("tool-active",b===btn));
  }));
  document.querySelectorAll("[data-indicator]").forEach(input=>input.addEventListener("change",()=>{state.indicators[input.dataset.indicator]=input.checked;drawChart()}));
  document.querySelectorAll("[data-confirm]").forEach(input=>{state.confirmations[input.dataset.confirm]=input.checked;input.addEventListener("change",()=>{state.confirmations[input.dataset.confirm]=input.checked;drawChart();if(state.position)renderTradeDesk()})});
@@ -429,6 +430,7 @@ function bindChartTools(){
   state.dragging={pan:true,startX:event.clientX,startEnd:state.view.end||state.candles.length};pointerStart=event.clientX;canvas.setPointerCapture(event.pointerId);
  });
  canvas.addEventListener("pointermove",event=>{
+  if(state.draft&&!state.dragging){state.draft.p2={index:chartIndexAt(event.clientX),price:priceAt(event.clientY)};drawChart();return}
   if(!state.dragging)return;
   if(state.dragging.level){updatePositionLevel(state.dragging.level,priceAt(event.clientY));return}
   if(state.dragging.pan&&pointerStart!==null){
