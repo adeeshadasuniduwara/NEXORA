@@ -19,7 +19,7 @@ function ensureUi(){
  overlay=el("canvas",{id:"nexoraScriptOverlay",class:"nx-script-overlay","aria-hidden":"true"});
  const chartWrap=$("candleChart")?.parentElement;if(chartWrap){chartWrap.append(overlay);chartWrap.style.position="relative"}
  const toolbar=$("chart")?.querySelector(".chart-panel .panel-head .chart-controls");
- if(toolbar){const b=el("button",{id:"nexoraSettingsBtn",class:"nx-toolbar-btn",type:"button"},"⚙ Settings");toolbar.append(b);b.addEventListener("click",showSettings)}
+ if(toolbar){const reset=el("button",{id:"nexoraResetChartBtn",class:"nx-toolbar-btn",type:"button",title:"Reset zoom and pan to the default chart view"},"↺ Reset");toolbar.append(reset);reset.addEventListener("click",resetView);const b=el("button",{id:"nexoraSettingsBtn",class:"nx-toolbar-btn",type:"button"},"⚙ Settings");toolbar.append(b);b.addEventListener("click",showSettings)}
  const row=$("chart")?.querySelector(".chart-panel .chart-tool-row .chart-actions");
  if(row){const b=el("button",{id:"nexoraPineBtn",type:"button"},"⌘ Pine Script");row.append(b);b.addEventListener("click",showScriptEditor)}
  const canvas=$("candleChart");
