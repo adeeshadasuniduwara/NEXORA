@@ -8,6 +8,8 @@ A chart-first crypto market analysis workspace powered by Binance public market 
 - SQLite-backed historical candle storage and bounded backfill.
 - Binance Spot WebSocket streams for candles, trades, book ticker events and all-market tickers.
 - Local animated browser workspace with a project-owned candlestick renderer, pair search, live movers and selected-pair order book.
+- Pro chart tools: collision-aware SMC structure annotations, sweep/IDM markers, Fibonacci retracement, rays, vertical time markers, trendlines and zones.
+- Chart history pan/zoom and one editable position plan with Entry, Stop Loss and three targets.
 - Windows launcher with environment setup and dependency repair.
 - Central GitHub Releases updater: running clients check for releases, verify the update archive SHA-256, install the update, restart, and show the release notes and installation time.
 
