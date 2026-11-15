@@ -16,6 +16,9 @@ def test_pro_chart_workspace_assets_and_context_menu_are_served():
         assert feature in script.text
     assert styles.status_code == 200
     assert ".nx-context" in styles.text
+    assert "Bullish candle" in script.text
+    assert "Chart background" in script.text
+    assert "NEXORA_CHART_UP" in client.get("/assets/app.js").text
 
 
 def test_pine_subset_is_explicitly_limited_and_safe():
